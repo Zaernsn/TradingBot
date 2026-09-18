@@ -11,6 +11,13 @@ from app.ml.backtest import BacktestEngine
 
 router = APIRouter(prefix="/market", tags=["market"])
 
+CURATED_PAIRS = ["BTC/EUR", "ETH/EUR", "SOL/EUR", "XRP/EUR", "ADA/EUR"]
+
+
+@router.get("/pairs")
+def get_pairs():
+    return CURATED_PAIRS
+
 
 @router.get("/price/{symbol}", response_model=MarketPrice)
 async def get_price(symbol: str):
