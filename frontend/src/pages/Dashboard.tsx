@@ -7,11 +7,13 @@ import {
   Signal,
   BotState,
   OHLCV,
+  RiskConfig,
 } from '../types';
 import {
   portfolioApi,
   marketApi,
   botApi,
+  settingsApi,
 } from '../services/api';
 
 export default function Dashboard() {
@@ -22,8 +24,18 @@ export default function Dashboard() {
   const [botState, setBotState] = useState<BotState | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [ohlcv, setOhlcv] = useState<OHLCV[]>([]);
-  const symbol = 'BTC/EUR';
+  const [risk, setRisk] = useState<RiskConfig | null>(null);
+  const symbol = risk?.trading_pair || 'BTC/EUR';
   const [error, setError] = useState('');
+
+  const loadRisk = async () => {
+    try {
+      const res = await settingsApi.getRisk();
+      setRisk(res.data);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to load risk config');
+    }
+  };
 
   const fetchAll = async () => {
     try {
@@ -48,6 +60,10 @@ export default function Dashboard() {
       setError(err.response?.data?.detail || 'Failed to load dashboard');
     }
   };
+
+  useEffect(() => {
+    loadRisk();
+  }, []);
 
   useEffect(() => {
     fetchAll();
@@ -100,6 +116,7 @@ export default function Dashboard() {
           <div className="text-muted">Mode</div>
           <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{portfolio?.mode}</div>
           <div className="text-muted">{botState?.health}</div>
+          <div className="text-muted">Pair: {symbol}</div>
         </div>
       </div>
 
