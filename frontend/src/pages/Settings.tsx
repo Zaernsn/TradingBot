@@ -1,4 +1,15 @@
 import { useEffect, useState } from 'react';
+import {
+  Shield,
+  TrendingUp,
+  RotateCcw,
+  Key,
+  Activity,
+  AlertTriangle,
+  Play,
+  Save,
+  TestTube,
+} from 'lucide-react';
 import { RiskConfig, BacktestResult } from '../types';
 import { settingsApi, marketApi } from '../services/api';
 
@@ -78,9 +89,13 @@ export default function Settings() {
   };
 
   const disableLive = async () => {
-    await settingsApi.disableLive();
-    setMessage('Switched to paper mode');
-    load();
+    try {
+      await settingsApi.disableLive();
+      setMessage('Switched to paper mode');
+      load();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to disable live mode');
+    }
   };
 
   const runBacktest = async () => {
@@ -120,113 +135,215 @@ export default function Settings() {
 
   return (
     <div>
-      <h2>Settings</h2>
-      {message && <p style={{ color: 'var(--success)' }}>{message}</p>}
-      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
+      <h2 className="section-title">Settings</h2>
 
-      <div className="card">
-        <h3>Risk Parameters</h3>
-        {risk && (
-          <form onSubmit={updateRisk} style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+      {message && (
+        <div className="card mb-2" style={{ borderColor: 'rgba(16,185,129,0.4)', background: 'var(--success-dim)' }}>
+          <div className="flex items-center gap-2 text-success">
+            <Activity size={18} />
+            {message}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="card mb-2" style={{ borderColor: 'rgba(239,68,68,0.4)', background: 'var(--danger-dim)' }}>
+          <div className="flex items-center gap-2 text-danger">
+            <AlertTriangle size={18} />
+            {error}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-12 mb-3">
+        {/* Risk Parameters */}
+        <div className="card span-6">
+          <div className="card-header">
+            <div className="card-title">
+              <Shield className="card-title-icon" size={18} />
+              Risk Parameters
+            </div>
+          </div>
+          {risk && (
+            <form onSubmit={updateRisk} className="grid" style={{ gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+              <label>
+                Trading Pair
+                <select value={risk.trading_pair} onChange={(e) => setRisk({ ...risk, trading_pair: e.target.value })}>
+                  {pairs.map((pair) => (
+                    <option key={pair} value={pair}>{pair}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Max Position (%)
+                <input type="number" step="0.01" value={risk.max_position_pct} onChange={(e) => setRisk({ ...risk, max_position_pct: parseFloat(e.target.value) })} />
+              </label>
+              <label>
+                Stop Loss (%)
+                <input type="number" step="0.01" value={risk.stop_loss_pct} onChange={(e) => setRisk({ ...risk, stop_loss_pct: parseFloat(e.target.value) })} />
+              </label>
+              <label>
+                Take Profit (%)
+                <input type="number" step="0.01" value={risk.take_profit_pct} onChange={(e) => setRisk({ ...risk, take_profit_pct: parseFloat(e.target.value) })} />
+              </label>
+              <label>
+                Fee (%)
+                <input type="number" step="0.0001" value={risk.fee_pct} onChange={(e) => setRisk({ ...risk, fee_pct: parseFloat(e.target.value) })} />
+              </label>
+              <label>
+                Max Daily Trades
+                <input type="number" value={risk.max_daily_trades} onChange={(e) => setRisk({ ...risk, max_daily_trades: parseInt(e.target.value) })} />
+              </label>
+              <label>
+                Prediction Horizon
+                <input type="number" value={risk.prediction_horizon} onChange={(e) => setRisk({ ...risk, prediction_horizon: parseInt(e.target.value) })} />
+              </label>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <button className="btn-primary" type="submit">
+                  <Save size={16} />
+                  Save Risk Settings
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Kraken Connection */}
+        <div className="card span-6">
+          <div className="card-header">
+            <div className="card-title">
+              <Key className="card-title-icon" size={18} />
+              Kraken Connection
+            </div>
+            <span className={`badge ${exchange?.connected ? 'badge-success' : 'badge-warning'}`}>
+              {exchange?.connected ? 'Connected' : 'Not Connected'}
+            </span>
+          </div>
+          <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+            Stored key: <span className="mono">{exchange?.masked_key || '****'}</span>
+          </p>
+          <form onSubmit={saveKraken} className="grid" style={{ gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
-              Trading Pair
-              <select value={risk.trading_pair} onChange={(e) => setRisk({ ...risk, trading_pair: e.target.value })}>
-                {pairs.map((pair) => (
-                  <option key={pair} value={pair}>{pair}</option>
-                ))}
-              </select>
+              API Key
+              <input type="password" value={krakenKey} onChange={(e) => setKrakenKey(e.target.value)} placeholder="Enter API key" />
             </label>
             <label>
-              Max Position (% of equity)
-              <input type="number" step="0.01" value={risk.max_position_pct} onChange={(e) => setRisk({ ...risk, max_position_pct: parseFloat(e.target.value) })} />
+              API Secret
+              <input type="password" value={krakenSecret} onChange={(e) => setKrakenSecret(e.target.value)} placeholder="Enter API secret" />
             </label>
-            <label>
-              Stop Loss (%)
-              <input type="number" step="0.01" value={risk.stop_loss_pct} onChange={(e) => setRisk({ ...risk, stop_loss_pct: parseFloat(e.target.value) })} />
-            </label>
-            <label>
-              Take Profit (%)
-              <input type="number" step="0.01" value={risk.take_profit_pct} onChange={(e) => setRisk({ ...risk, take_profit_pct: parseFloat(e.target.value) })} />
-            </label>
-            <label>
-              Fee (%)
-              <input type="number" step="0.0001" value={risk.fee_pct} onChange={(e) => setRisk({ ...risk, fee_pct: parseFloat(e.target.value) })} />
-            </label>
-            <label>
-              Max Daily Trades
-              <input type="number" value={risk.max_daily_trades} onChange={(e) => setRisk({ ...risk, max_daily_trades: parseInt(e.target.value) })} />
-            </label>
-            <label>
-              Prediction Horizon (candles)
-              <input type="number" value={risk.prediction_horizon} onChange={(e) => setRisk({ ...risk, prediction_horizon: parseInt(e.target.value) })} />
-            </label>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <button className="btn-primary" type="submit">Save Risk Settings</button>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem' }}>
+              <button className="btn-primary" type="submit">
+                <Save size={16} />
+                Save Credentials
+              </button>
+              <button className="btn-ghost" type="button" onClick={testKraken} disabled={!exchange?.connected}>
+                <TestTube size={16} />
+                Test Connection
+              </button>
             </div>
           </form>
-        )}
-      </div>
-
-      <div className="card">
-        <h3>Kraken Connection</h3>
-        <p className="text-muted">Status: {exchange?.connected ? `Connected (${exchange.masked_key})` : 'Not connected'}</p>
-        <form onSubmit={saveKraken} style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          <label>
-            API Key
-            <input type="password" value={krakenKey} onChange={(e) => setKrakenKey(e.target.value)} placeholder="Enter API key" />
-          </label>
-          <label>
-            API Secret
-            <input type="password" value={krakenSecret} onChange={(e) => setKrakenSecret(e.target.value)} placeholder="Enter API secret" />
-          </label>
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem' }}>
-            <button className="btn-primary" type="submit">Save Credentials</button>
-            <button className="btn-primary" type="button" onClick={testKraken} disabled={!exchange?.connected}>Test Connection</button>
-          </div>
-        </form>
-      </div>
-
-      <div className="card">
-        <h3>Backtest</h3>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          <input value={backtestSymbol} onChange={(e) => setBacktestSymbol(e.target.value)} placeholder="Symbol" />
-          <button className="btn-primary" onClick={runBacktest} disabled={backtestLoading}>
-            {backtestLoading ? 'Running...' : 'Run Backtest'}
-          </button>
         </div>
-        {backtestResult && (
-          <div className="grid grid-4">
-            <div>Initial: €{backtestResult.initial_cash.toFixed(2)}</div>
-            <div>Final: €{backtestResult.final_equity.toFixed(2)}</div>
-            <div>Return: {(backtestResult.total_return_pct * 100).toFixed(2)}%</div>
-            <div>Trades: {backtestResult.num_trades}</div>
-            <div>Win Rate: {(backtestResult.win_rate * 100).toFixed(1)}%</div>
-            <div>Max DD: {(backtestResult.max_drawdown_pct * 100).toFixed(2)}%</div>
-            <div>Sharpe: {backtestResult.sharpe_ratio.toFixed(2)}</div>
+
+        {/* Backtest */}
+        <div className="card span-6">
+          <div className="card-header">
+            <div className="card-title">
+              <TrendingUp className="card-title-icon" size={18} />
+              Backtest
+            </div>
           </div>
-        )}
-      </div>
-
-      <div className="card">
-        <h3>Paper Portfolio</h3>
-        <button className="btn-danger" onClick={resetPaper}>Reset Paper Portfolio to €500</button>
-        <p className="text-muted">This deletes all paper-trading history and cannot be undone.</p>
-      </div>
-
-      <div className="card">
-        <h3>Live Trading Safety</h3>
-        <p className="text-muted">Live trading status: {safety?.enable_live_trading_env ? 'Enabled in environment' : 'Disabled in environment'}</p>
-        <p className="text-muted">API credentials: {safety?.api_credentials_present ? 'Present' : 'Missing'}</p>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn-success" onClick={enableLive} disabled={!safety?.live_possible}>
-            Enable Live Trading
-          </button>
-          <button className="btn-warning" onClick={disableLive}>Switch to Paper</button>
+          <div className="flex gap-2 mb-2">
+            <input value={backtestSymbol} onChange={(e) => setBacktestSymbol(e.target.value)} placeholder="Symbol" style={{ maxWidth: '160px' }} />
+            <button className="btn-primary" onClick={runBacktest} disabled={backtestLoading}>
+              <Play size={16} />
+              {backtestLoading ? 'Running...' : 'Run Backtest'}
+            </button>
+          </div>
+          {backtestResult && (
+            <div className="grid" style={{ gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}>
+              <div className="card" style={{ padding: '0.75rem' }}>
+                <div className="metric-label">Initial</div>
+                <div className="mono" style={{ fontSize: '1.1rem' }}>€{backtestResult.initial_cash.toFixed(2)}</div>
+              </div>
+              <div className="card" style={{ padding: '0.75rem' }}>
+                <div className="metric-label">Final</div>
+                <div className="mono" style={{ fontSize: '1.1rem' }}>€{backtestResult.final_equity.toFixed(2)}</div>
+              </div>
+              <div className="card" style={{ padding: '0.75rem' }}>
+                <div className="metric-label">Return</div>
+                <div className={`mono ${backtestResult.total_return_pct >= 0 ? 'text-success' : 'text-danger'}`} style={{ fontSize: '1.1rem' }}>
+                  {(backtestResult.total_return_pct * 100).toFixed(2)}%
+                </div>
+              </div>
+              <div className="card" style={{ padding: '0.75rem' }}>
+                <div className="metric-label">Trades</div>
+                <div className="mono" style={{ fontSize: '1.1rem' }}>{backtestResult.num_trades}</div>
+              </div>
+              <div className="card" style={{ padding: '0.75rem' }}>
+                <div className="metric-label">Win Rate</div>
+                <div className="mono" style={{ fontSize: '1.1rem' }}>{(backtestResult.win_rate * 100).toFixed(1)}%</div>
+              </div>
+              <div className="card" style={{ padding: '0.75rem' }}>
+                <div className="metric-label">Max DD</div>
+                <div className="mono text-danger" style={{ fontSize: '1.1rem' }}>{(backtestResult.max_drawdown_pct * 100).toFixed(2)}%</div>
+              </div>
+            </div>
+          )}
         </div>
-        <p className="text-muted" style={{ marginTop: '0.5rem' }}>
-          Live trading requires the server env flag, valid API credentials, and your explicit confirmation.
-          Withdrawal permissions are rejected.
-        </p>
+
+        {/* Live Trading Safety */}
+        <div className="card span-6">
+          <div className="card-header">
+            <div className="card-title">
+              <Activity className="card-title-icon" size={18} />
+              Live Trading Safety
+            </div>
+          </div>
+          <div className="grid" style={{ gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '1rem' }}>
+            <div className="card" style={{ padding: '0.75rem' }}>
+              <div className="metric-label">Environment</div>
+              <div className={`badge ${safety?.enable_live_trading_env ? 'badge-success' : 'badge-warning'}`}>
+                {safety?.enable_live_trading_env ? 'Enabled' : 'Disabled'}
+              </div>
+            </div>
+            <div className="card" style={{ padding: '0.75rem' }}>
+              <div className="metric-label">Credentials</div>
+              <div className={`badge ${safety?.api_credentials_present ? 'badge-success' : 'badge-danger'}`}>
+                {safety?.api_credentials_present ? 'Present' : 'Missing'}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-success" onClick={enableLive} disabled={!safety?.live_possible}>
+              <Play size={16} />
+              Enable Live Trading
+            </button>
+            <button className="btn-warning" onClick={disableLive}>
+              <RotateCcw size={16} />
+              Switch to Paper
+            </button>
+          </div>
+          <p className="text-muted mt-1" style={{ fontSize: '0.82rem' }}>
+            Live trading requires the server env flag, valid API credentials, and your explicit confirmation. Withdrawal permissions are rejected.
+          </p>
+        </div>
+      </div>
+
+      {/* Paper Portfolio Reset */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">
+            <RotateCcw className="card-title-icon" size={18} />
+            Paper Portfolio
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="btn-danger" onClick={resetPaper}>
+            <RotateCcw size={16} />
+            Reset to €500
+          </button>
+          <span className="text-muted" style={{ fontSize: '0.85rem' }}>Deletes all paper-trading history. Cannot be undone.</span>
+        </div>
       </div>
     </div>
   );
