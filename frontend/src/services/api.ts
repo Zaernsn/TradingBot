@@ -52,6 +52,7 @@ export const marketApi = {
     api.get(`/market/ohlcv/${symbol}?timeframe=${timeframe}&limit=${limit}`),
   backtest: (symbol: string, initialCash = 500, feePct = 0.0026) =>
     api.post('/market/backtest', { symbol, initial_cash: initialCash, fee_pct: feePct }),
+  getPairs: () => api.get<string[]>('/market/pairs'),
 };
 
 export const botApi = {
@@ -76,4 +77,8 @@ export const settingsApi = {
   getSafety: () => api.get('/settings/safety'),
   enableLive: () => api.post('/settings/enable-live?confirm=true'),
   disableLive: () => api.post('/settings/disable-live'),
+  getExchange: () => api.get<{ connected: boolean; masked_key: string }>('/settings/exchange'),
+  saveExchange: (api_key: string, api_secret: string) =>
+    api.post('/settings/exchange', { api_key, api_secret }),
+  testExchange: () => api.post('/settings/exchange/test'),
 };
