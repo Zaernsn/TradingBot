@@ -19,5 +19,10 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class UserLoginJSON(BaseModel):
+    email: EmailStr
+    password: str
+
+
 class TokenPayload(BaseModel):
     sub: int
