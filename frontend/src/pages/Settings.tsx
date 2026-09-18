@@ -5,6 +5,10 @@ import { settingsApi, marketApi } from '../services/api';
 export default function Settings() {
   const [risk, setRisk] = useState<RiskConfig | null>(null);
   const [safety, setSafety] = useState<any>(null);
+  const [exchange, setExchange] = useState<{ connected: boolean; masked_key: string } | null>(null);
+  const [pairs, setPairs] = useState<string[]>([]);
+  const [krakenKey, setKrakenKey] = useState('');
+  const [krakenSecret, setKrakenSecret] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [backtestSymbol, setBacktestSymbol] = useState('BTC/EUR');
@@ -17,9 +21,16 @@ export default function Settings() {
 
   const load = async () => {
     try {
-      const [riskRes, safetyRes] = await Promise.all([settingsApi.getRisk(), settingsApi.getSafety()]);
+      const [riskRes, safetyRes, pairsRes, exchangeRes] = await Promise.all([
+        settingsApi.getRisk(),
+        settingsApi.getSafety(),
+        marketApi.getPairs(),
+        settingsApi.getExchange(),
+      ]);
       setRisk(riskRes.data);
       setSafety(safetyRes.data);
+      setPairs(pairsRes.data);
+      setExchange(exchangeRes.data);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load settings');
@@ -85,6 +96,28 @@ export default function Settings() {
     }
   };
 
+  const saveKraken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await settingsApi.saveExchange(krakenKey, krakenSecret);
+      setKrakenKey('');
+      setKrakenSecret('');
+      setMessage('Kraken credentials saved');
+      load();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to save credentials');
+    }
+  };
+
+  const testKraken = async () => {
+    try {
+      const res = await settingsApi.testExchange();
+      setMessage(res.data.detail);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Connection test failed');
+    }
+  };
+
   return (
     <div>
       <h2>Settings</h2>
@@ -97,7 +130,11 @@ export default function Settings() {
           <form onSubmit={updateRisk} style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             <label>
               Trading Pair
-              <input value={risk.trading_pair} onChange={(e) => setRisk({ ...risk, trading_pair: e.target.value })} />
+              <select value={risk.trading_pair} onChange={(e) => setRisk({ ...risk, trading_pair: e.target.value })}>
+                {pairs.map((pair) => (
+                  <option key={pair} value={pair}>{pair}</option>
+                ))}
+              </select>
             </label>
             <label>
               Max Position (% of equity)
@@ -128,6 +165,25 @@ export default function Settings() {
             </div>
           </form>
         )}
+      </div>
+
+      <div className="card">
+        <h3>Kraken Connection</h3>
+        <p className="text-muted">Status: {exchange?.connected ? `Connected (${exchange.masked_key})` : 'Not connected'}</p>
+        <form onSubmit={saveKraken} style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <label>
+            API Key
+            <input type="password" value={krakenKey} onChange={(e) => setKrakenKey(e.target.value)} placeholder="Enter API key" />
+          </label>
+          <label>
+            API Secret
+            <input type="password" value={krakenSecret} onChange={(e) => setKrakenSecret(e.target.value)} placeholder="Enter API secret" />
+          </label>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem' }}>
+            <button className="btn-primary" type="submit">Save Credentials</button>
+            <button className="btn-primary" type="button" onClick={testKraken} disabled={!exchange?.connected}>Test Connection</button>
+          </div>
+        </form>
       </div>
 
       <div className="card">
