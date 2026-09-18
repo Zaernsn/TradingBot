@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     KRAKEN_API_KEY: str = ""
     KRAKEN_API_SECRET: str = ""
+    KRAKEN_ENCRYPTION_KEY: str = ""
 
     DEFAULT_PAPER_BALANCE_EUR: float = 500.0
     DEFAULT_TRADING_PAIR: str = "BTC/EUR"
