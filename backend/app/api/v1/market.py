@@ -19,7 +19,7 @@ def get_pairs():
     return CURATED_PAIRS
 
 
-@router.get("/price/{symbol}", response_model=MarketPrice)
+@router.get("/price/{symbol:path}", response_model=MarketPrice)
 async def get_price(symbol: str):
     exchange = PaperExchange()
     try:
@@ -35,7 +35,7 @@ async def get_price(symbol: str):
         raise HTTPException(status_code=502, detail=str(e))
 
 
-@router.get("/ohlcv/{symbol}")
+@router.get("/ohlcv/{symbol:path}")
 async def get_ohlcv(symbol: str, timeframe: str = "1h", limit: int = 100):
     exchange = PaperExchange()
     try:
