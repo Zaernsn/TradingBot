@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.db.base import Base
 from app.core.config import settings
+import app.models  # noqa: F401
 
 config = context.config
 
