@@ -29,11 +29,26 @@ jobs:
             backend/requirements.txt
             backend/requirements-dev.txt
       - name: Test backend
+        id: backend-tests
+        continue-on-error: true
         working-directory: backend
+        shell: bash
         run: |
+          set -o pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
-          pytest -q
+          pytest -q --tb=short 2>&1 | tee pytest-output.txt
+      - name: Report backend test failure
+        if: steps.backend-tests.outcome == 'failure'
+        shell: bash
+        run: |
+          {
+            echo '### Backend test failure'
+            echo '```text'
+            tail -n 200 backend/pytest-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
