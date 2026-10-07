@@ -20,6 +20,9 @@ jobs:
   backend-test:
     name: backend tests (${{ matrix.group }})
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:////tmp/trading-bot-${{ matrix.group }}.db
+      MODEL_DIR: /tmp/trading-bot-models-${{ matrix.group }}
     strategy:
       fail-fast: false
       matrix:
