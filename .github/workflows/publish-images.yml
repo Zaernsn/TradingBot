@@ -17,8 +17,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
+  backend-test:
+    name: backend tests (${{ matrix.group }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: autonomous
+            tests: >-
+              tests/test_adaptive_strategy.py tests/test_autonomous.py
+              tests/test_autonomous_api.py tests/test_fast_meme_policy.py
+              tests/test_fast_momentum.py tests/test_memecoins.py
+              tests/test_drift_recovery.py tests/test_forward_and_hints.py
+          - group: execution
+            tests: >-
+              tests/test_account_overview.py tests/test_cash_reconciliation.py
+              tests/test_execution_safety.py tests/test_kraken_order_requests.py
+              tests/test_trading.py tests/test_preflight_errors.py
+          - group: models
+            tests: >-
+              tests/test_features.py tests/test_models.py tests/test_research.py
+              tests/test_signal_qualification.py tests/test_buy_threshold.py
+          - group: api-and-storage
+            tests: >-
+              tests/test_auth.py tests/test_discovery_and_resend.py
+              tests/test_exchange_service.py tests/test_market.py
+              tests/test_migrations.py tests/test_settings.py
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,26 +54,17 @@ jobs:
             backend/requirements.txt
             backend/requirements-dev.txt
       - name: Test backend
-        id: backend-tests
-        continue-on-error: true
         working-directory: backend
-        shell: bash
         run: |
-          set -o pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
-          pytest -q --tb=short 2>&1 | tee pytest-output.txt
-      - name: Report backend test failure
-        if: steps.backend-tests.outcome == 'failure'
-        shell: bash
-        run: |
-          {
-            echo '### Backend test failure'
-            echo '```text'
-            tail -n 200 backend/pytest-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+          pytest -q --tb=short ${{ matrix.tests }}
+
+  frontend-test:
+    name: frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -62,7 +78,7 @@ jobs:
           npm run build
 
   publish:
-    needs: test
+    needs: [backend-test, frontend-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
