@@ -41,7 +41,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
-    && mkdir -p /srv /var/lib/trading-bot/models /var/lib/trading-bot/caddy-data /var/lib/trading-bot/caddy-config \
+    && mkdir -p /app /srv /var/lib/trading-bot/models /var/lib/trading-bot/caddy-data /var/lib/trading-bot/caddy-config \
     && chown -R app:app /app /srv /var/lib/trading-bot
 
 WORKDIR /app
