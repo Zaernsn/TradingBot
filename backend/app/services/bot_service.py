@@ -10,7 +10,7 @@ from app.models.user import User
 from app.exchanges.paper import PaperExchange
 from app.exchanges.base import OrderSide
 from app.exchanges.universe import CURATED_PAIRS, is_memecoin, WATCHLIST_LIMIT
-from app.services.memecoin_service import eligible_universe, check_liquidity, memecoin_budget
+from app.services.memecoin_service import LiquidityLimitError, eligible_universe, check_liquidity, memecoin_budget
 from app.services.portfolio_service import get_or_create_portfolio, recalculate_equity, update_position_price, get_position
 from app.services.trading_service import execute_paper_trade, exit_reason
 from app.services.risk_service import get_risk_config, risk_manager_from_config, entry_budget, check_drawdown
@@ -618,7 +618,10 @@ class BotOrchestrator:
                     else:
                         message=str(exc) if isinstance(exc,ValueError) else preflight_error(exc)
                         explain(symbol,'liquidity',message)
-                    errors.append(f'{symbol}: '+(str(exc) if isinstance(exc,ValueError) else preflight_error(exc)))
+                    # A spread/turnover limit is a normal "wait" decision, not a bot fault.
+                    # Keep it on the coin row without degrading global health or showing a red error.
+                    if not isinstance(exc, LiquidityLimitError):
+                        errors.append(f'{symbol}: '+(str(exc) if isinstance(exc,ValueError) else preflight_error(exc)))
                     continue
                 budget=entry_budget(portfolio,risk,symbol,positions,histories)
                 if canary:

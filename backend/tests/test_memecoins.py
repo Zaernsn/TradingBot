@@ -97,7 +97,7 @@ async def test_memecoin_liquidity_fails_closed(setup_bot):
     c=setup_bot;c.risk.memecoins_enabled=True;exchange=adapter()
     await check_liquidity(exchange,'DOGE/EUR',c.risk)
     exchange.client.fetch_ticker.return_value['ask']=.11
-    with pytest.raises(ValueError,match='spread'): await check_liquidity(exchange,'DOGE/EUR',c.risk)
+    with pytest.raises(ValueError,match='Spread is currently.*your maximum'): await check_liquidity(exchange,'DOGE/EUR',c.risk)
     exchange.client.fetch_ticker.return_value={'bid':.1,'ask':.1001,'last':.1,'quoteVolume':1}
     with pytest.raises(ValueError,match='turnover'): await check_liquidity(exchange,'DOGE/EUR',c.risk)
     exchange.client.fetch_ticker.return_value={}

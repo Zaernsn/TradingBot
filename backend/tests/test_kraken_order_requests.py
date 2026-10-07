@@ -152,7 +152,7 @@ async def test_entry_readiness_keeps_actual_spread_failure_message():
     history = [Candle(now, 1.0) for _ in range(30)]
     exchange = SimpleNamespace(
         market=SimpleNamespace(
-            client=SimpleNamespace(fetch_ticker=AsyncMock(side_effect=ValueError('Memecoin spread exceeds configured limit'))),
+            client=SimpleNamespace(fetch_ticker=AsyncMock(side_effect=ValueError('Spread is currently 0.80%; your maximum is 0.30%. Waiting for a tighter quote.'))),
             get_order_book=AsyncMock(),
             prepare_order=AsyncMock(),
         ),
@@ -169,7 +169,7 @@ async def test_entry_readiness_keeps_actual_spread_failure_message():
     portfolio = SimpleNamespace(equity=1000.0, cash=1000.0)
     messages = await entry_readiness(exchange, portfolio, risk, 'DOGE/EUR', [], {'DOGE/EUR': history})
     assert messages['eligible'] is False
-    assert 'Memecoin spread exceeds configured limit' in messages['message']
+    assert 'Spread is currently 0.80%; your maximum is 0.30%' in messages['message']
     assert 'Market preflight unavailable' not in messages['message']
 
 

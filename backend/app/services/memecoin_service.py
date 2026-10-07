@@ -6,6 +6,10 @@ from datetime import datetime, timezone
 from app.exchanges.universe import CURATED_PAIRS, is_memecoin
 
 
+class LiquidityLimitError(ValueError):
+    """An expected, temporary market condition that makes an entry ineligible."""
+
+
 async def eligible_universe(exchange, risk, diagnostics=None):
     if not risk.memecoins_enabled: return list(CURATED_PAIRS)
     adapter=exchange.market if hasattr(exchange,'market') else exchange
@@ -67,11 +71,18 @@ def validate_liquidity(ticker, risk, enforce_limits=True):
         if not all(isfinite(v) and v>0 for v in [bid,ask,last,turnover]) or ask<bid: raise ValueError()
     except (KeyError,TypeError,ValueError):
         raise ValueError('Memecoin quote/liquidity data unavailable')
-    if enforce_limits and (ask-bid)/((ask+bid)/2)>risk.memecoin_max_spread_pct:
-        raise ValueError('Memecoin spread exceeds configured limit')
+    spread=(ask-bid)/((ask+bid)/2)
+    if enforce_limits and spread>risk.memecoin_max_spread_pct:
+        raise LiquidityLimitError(
+            f'Spread is currently {spread:.2%}; your maximum is {risk.memecoin_max_spread_pct:.2%}. '
+            'Waiting for a tighter quote.'
+        )
     if enforce_limits and turnover<risk.memecoin_min_daily_volume_eur:
-        raise ValueError('Memecoin EUR-pair turnover is below configured minimum')
-    return turnover, (ask-bid)/((ask+bid)/2)
+        raise LiquidityLimitError(
+            f'24-hour EUR turnover is currently €{turnover:,.0f}; your minimum is '
+            f'€{risk.memecoin_min_daily_volume_eur:,.0f}. Waiting for more liquidity.'
+        )
+    return turnover, spread
 
 
 def memecoin_budget(portfolio,risk,symbol,positions):

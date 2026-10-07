@@ -46,6 +46,53 @@ export default function Dashboard() {
   const [botAction, setBotAction] = useState<'toggle' | 'emergency' | null>(null);
 
   const fetching = useRef(false);
+  const quoteFetching = useRef(false);
+  const mounted = useRef(true);
+  const candleCache = useRef<Record<string, { loadedAt: number; candles: Parameters<typeof summarizeCandles>[1] }>>({});
+
+  const refreshQuotes = async (requestedSymbols: string[]) => {
+    if (quoteFetching.current) return;
+    quoteFetching.current = true;
+    const symbols = [...new Set(requestedSymbols)];
+    const fresh: Record<string, CoinQuote> = {};
+    const pending = [...symbols];
+    const cacheMaxAge = 5 * 60 * 1000;
+    try {
+      // Price data stays current while the much larger candle history is reused for five minutes.
+      await Promise.all(Array.from({ length: Math.min(4, pending.length) }, async () => {
+        let symbol: string | undefined;
+        while ((symbol = pending.shift()) !== undefined) {
+          const cached = candleCache.current[symbol];
+          const reloadCandles = !cached || Date.now() - cached.loadedAt >= cacheMaxAge;
+          const [ticker, candles] = await Promise.allSettled([
+            marketApi.getPrice(symbol),
+            reloadCandles
+              ? marketApi.getOHLCV(symbol, '1h', 170).then(response => response.data)
+              : Promise.resolve(cached.candles),
+          ]);
+          if (candles.status === 'fulfilled' && reloadCandles) {
+            candleCache.current[symbol] = { loadedAt: Date.now(), candles: candles.value };
+          }
+          if (ticker.status === 'fulfilled' && candles.status === 'fulfilled') {
+            fresh[symbol] = summarizeCandles(ticker.value.data.price, candles.value);
+          }
+        }
+      }));
+      if (mounted.current) {
+        setQuotes(current => {
+          const retained: Record<string, CoinQuote> = {};
+          for (const symbol of symbols) {
+            const quote = fresh[symbol] || current[symbol];
+            if (quote) retained[symbol] = quote;
+          }
+          return retained;
+        });
+      }
+    } finally {
+      quoteFetching.current = false;
+    }
+  };
+
   const fetchAll = async () => {
     if (fetching.current) return;
     fetching.current = true;
@@ -65,25 +112,11 @@ export default function Dashboard() {
       setSignals(sRes.data);
       setBotState(bRes.data);
       setResearch(rRes.data);
-      // Reveal the useful dashboard immediately; quote enrichment can continue in place.
       setInitialLoading(false);
       const watchlist: string[] = [...new Set<string>([...(bRes.data.watchlist || []), ...posRes.data.map((p: Position) => p.symbol)])];
-      const fresh: Record<string, CoinQuote> = {};
-      const pending = [...watchlist];
-      // Bound requests as the watchlist grows to 30 markets.
-      await Promise.all(Array.from({ length: Math.min(3, pending.length) }, async () => {
-        let symbol: string | undefined;
-        while ((symbol = pending.shift()) !== undefined) {
-          const [ticker, candles] = await Promise.allSettled([
-            marketApi.getPrice(symbol), marketApi.getOHLCV(symbol, '1h', 170),
-          ]);
-          if (ticker.status === 'fulfilled') {
-            fresh[symbol] = summarizeCandles(ticker.value.data.price, candles.status === 'fulfilled' ? candles.value.data : []);
-            setQuotes(current => ({ ...current, [symbol as string]: fresh[symbol as string] }));
-          }
-        }
-      }));
-      setQuotes(fresh);
+      // Quote enrichment is deliberately background work so it cannot hold the whole UI
+      // in a refreshing state or delay bot controls and portfolio updates.
+      void refreshQuotes(watchlist);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load dashboard');
@@ -95,10 +128,11 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    mounted.current = true;
     fetchAll();
     const interval = setInterval(fetchAll, 30000);
     const clock = setInterval(() => setNow(Date.now()), 1000);
-    return () => { clearInterval(interval); clearInterval(clock); };
+    return () => { mounted.current = false; clearInterval(interval); clearInterval(clock); };
   }, []);
 
   const toggleBot = async () => {
