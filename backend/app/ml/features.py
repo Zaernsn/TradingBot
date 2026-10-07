@@ -4,7 +4,9 @@ import pandas as pd
 from app.exchanges.base import OHLCV
 
 
-def build_features(candles: List[OHLCV]) -> pd.DataFrame:
+def build_features(candles: List[OHLCV], normalized: bool = False) -> pd.DataFrame:
+    if not candles:
+        return pd.DataFrame()
     df = pd.DataFrame(
         [
             {
@@ -28,7 +30,17 @@ def build_features(candles: List[OHLCV]) -> pd.DataFrame:
     df["volatility"] = df["returns"].rolling(window=14).std()
     df["volume_sma"] = df["volume"].rolling(window=10).mean()
     df["bb_upper"], df["bb_lower"] = bollinger_bands(df["close"], 20, 2)
-    df = df.dropna()
+    if normalized:
+        for name in ('sma_10', 'sma_30', 'ema_12'):
+            df[f'{name}_distance'] = df['close'] / df[name] - 1
+        df['macd_relative'] = df['macd'] / df['close']
+        df['macd_signal_relative'] = df['macd_signal'] / df['close']
+        width = df['bb_upper'] - df['bb_lower']
+        df['bb_width_relative'] = width / df['close']
+        df['bb_position'] = ((df['close'] - df['bb_lower']) / width.replace(0, np.nan)).where(width != 0, .5)
+        df['volume_relative'] = (df['volume'] / df['volume_sma'].replace(0, np.nan)).where(df['volume_sma'] != 0, 0.)
+        df = df.drop(columns=['sma_10', 'sma_30', 'ema_12', 'macd', 'macd_signal', 'bb_upper', 'bb_lower', 'volume_sma'])
+    df = df.replace([np.inf, -np.inf], np.nan).dropna()
     return df
 
 
@@ -39,7 +51,7 @@ def compute_rsi(prices: pd.Series, period: int = 14) -> pd.Series:
     avg_gain = gain.ewm(alpha=1 / period, min_periods=period).mean()
     avg_loss = loss.ewm(alpha=1 / period, min_periods=period).mean()
     rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+    return (100 - (100 / (1 + rs))).where((avg_gain != 0) | (avg_loss != 0), 50.)
 
 
 def bollinger_bands(prices: pd.Series, window: int = 20, num_std: int = 2):
@@ -48,7 +60,13 @@ def bollinger_bands(prices: pd.Series, window: int = 20, num_std: int = 2):
     return sma + num_std * std, sma - num_std * std
 
 
-def make_target(df: pd.DataFrame, horizon: int = 12) -> pd.Series:
-    """Target: 1 if close is higher `horizon` periods ahead, else 0."""
-    future_return = df["close"].shift(-horizon) / df["close"] - 1
-    return (future_return > 0).astype(int)
+def make_target(df: pd.DataFrame, horizon: int = 12, fee_pct: float = 0.0,
+                slippage_pct: float = 0.0) -> pd.Series:
+    """Cost-aware outcome; unknown future outcomes stay missing, never negative."""
+    if horizon < 1:
+        raise ValueError("horizon must be positive")
+    future = df["close"].shift(-horizon)
+    # Entry and exit costs, including adverse execution on both legs.
+    breakeven = (1 + slippage_pct) * (1 + fee_pct) / ((1 - slippage_pct) * (1 - fee_pct))
+    target = (future / df["close"] > breakeven).astype(float)
+    return target.where(future.notna())

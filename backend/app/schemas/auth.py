@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class UserCreate(BaseModel):
@@ -26,3 +26,19 @@ class UserLoginJSON(BaseModel):
 
 class TokenPayload(BaseModel):
     sub: int
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=32, max_length=128)
+    password: str = Field(min_length=12, max_length=72)
+
+    @field_validator('password')
+    @classmethod
+    def bcrypt_length(cls,value):
+        if len(value.encode('utf-8')) > 72:
+            raise ValueError('Password must not exceed 72 UTF-8 bytes')
+        return value

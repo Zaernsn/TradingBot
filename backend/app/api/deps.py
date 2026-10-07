@@ -26,6 +26,6 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except (ValueError, TypeError):
         raise credentials_exception
     user = db.query(User).filter(User.id == user_id).first()
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or payload.get("ver", 0) != user.token_version:
         raise credentials_exception
     return user

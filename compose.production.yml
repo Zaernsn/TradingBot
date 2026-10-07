@@ -1,0 +1,19 @@
+# One application image/container is published automatically to GHCR after tests pass on main.
+# Run with: docker compose --env-file .env.production -f compose.production.yml up -d
+services:
+  app:
+    image: ${APP_IMAGE:?Set the immutable application image tag}
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      DATABASE_URL: sqlite:////var/lib/trading-bot/tradingbot.db
+      MODEL_DIR: /var/lib/trading-bot/models
+      APP_HOST: ${APP_HOST:?Set your domain name}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - bot-data:/var/lib/trading-bot
+volumes:
+  bot-data:

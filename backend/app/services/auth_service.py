@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from app.models.user import User
 from app.models.portfolio import Portfolio, BotState, RiskConfig
@@ -13,8 +14,11 @@ def create_user(db: Session, email: str, password: str) -> User:
         raise HTTPException(status_code=400, detail="Email already registered")
     user = User(email=email, hashed_password=get_password_hash(password))
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email already registered")
 
     db.add(Portfolio(user_id=user.id, cash=settings.DEFAULT_PAPER_BALANCE_EUR, equity=settings.DEFAULT_PAPER_BALANCE_EUR))
     db.add(BotState(user_id=user.id))
@@ -29,6 +33,7 @@ def create_user(db: Session, email: str, password: str) -> User:
         )
     )
     db.commit()
+    db.refresh(user)
     return user
 
 
@@ -43,4 +48,4 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
 
 
 def generate_token(user: User) -> str:
-    return create_access_token({"sub": str(user.id)}, expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    return create_access_token({"sub": str(user.id), "ver": user.token_version}, expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))

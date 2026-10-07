@@ -20,7 +20,7 @@ export default function Layout() {
             <TrendingUp className="nav-brand-icon" size={24} strokeWidth={2.5} />
             <span>AI Trading Bot</span>
           </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <div className="nav-actions">
             <div className="nav-links">
               <Link to="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
                 <LayoutDashboard size={16} />
@@ -31,9 +31,9 @@ export default function Layout() {
                 Settings
               </Link>
             </div>
-            <button className="btn-danger" onClick={logout}>
+            <button className="btn-danger nav-logout" onClick={logout} aria-label="Log out" title="Log out">
               <LogOut size={16} />
-              Logout
+              <span>Logout</span>
             </button>
           </div>
         </div>

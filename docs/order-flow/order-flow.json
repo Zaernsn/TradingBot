@@ -1,0 +1,247 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Trading bot · signal to order outcome",
+    "locale": "en",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "decision",
+      "label": "Signal and controls"
+    },
+    {
+      "id": "exchange",
+      "label": "Live exchange"
+    },
+    {
+      "id": "exceptions",
+      "label": "Blocked or uncertain",
+      "variant": "exception"
+    },
+    {
+      "id": "ledger",
+      "label": "Accounting"
+    }
+  ],
+  "mainPath": [
+    "signal",
+    "risk",
+    "guard",
+    "intent",
+    "submit",
+    "ack",
+    "poll",
+    "fill"
+  ],
+  "nodes": [
+    {
+      "id": "signal",
+      "lane": "decision",
+      "col": 0,
+      "type": "backend",
+      "label": "Signal / exit",
+      "width": 150
+    },
+    {
+      "id": "risk",
+      "lane": "decision",
+      "col": 1,
+      "type": "security",
+      "label": "Entry risk + sizing",
+      "width": 150
+    },
+    {
+      "id": "guard",
+      "lane": "decision",
+      "col": 2,
+      "type": "security",
+      "label": "Execution guards",
+      "width": 150
+    },
+    {
+      "id": "intent",
+      "lane": "decision",
+      "col": 3,
+      "type": "database",
+      "label": "Durable intent",
+      "width": 150
+    },
+    {
+      "id": "submit",
+      "lane": "exchange",
+      "col": 3,
+      "type": "cloud",
+      "label": "Kraken IOC",
+      "width": 150
+    },
+    {
+      "id": "ack",
+      "lane": "exchange",
+      "col": 4,
+      "type": "database",
+      "label": "Acknowledged",
+      "width": 150
+    },
+    {
+      "id": "poll",
+      "lane": "exchange",
+      "col": 5,
+      "type": "backend",
+      "label": "Reconcile status",
+      "width": 150
+    },
+    {
+      "id": "fill",
+      "lane": "ledger",
+      "col": 5,
+      "type": "database",
+      "label": "Book fill delta",
+      "width": 150
+    },
+    {
+      "id": "blocked",
+      "lane": "exceptions",
+      "col": 1,
+      "type": "security",
+      "label": "Locally blocked",
+      "width": 150
+    },
+    {
+      "id": "unknown",
+      "lane": "exceptions",
+      "col": 3,
+      "type": "security",
+      "label": "UNKNOWN",
+      "width": 150
+    },
+    {
+      "id": "terminal",
+      "lane": "exceptions",
+      "col": 5,
+      "type": "security",
+      "label": "Rejected / canceled",
+      "width": 150
+    },
+    {
+      "id": "paper",
+      "lane": "ledger",
+      "col": 2,
+      "type": "backend",
+      "label": "Paper fill",
+      "width": 150
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "signal",
+      "to": "risk",
+      "label": "BUY + symbol",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e1",
+      "from": "risk",
+      "to": "guard",
+      "label": "quantity + quote",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e2",
+      "from": "signal",
+      "to": "guard",
+      "label": "SELL held quantity",
+      "variant": "default"
+    },
+    {
+      "id": "e3",
+      "from": "risk",
+      "to": "blocked",
+      "label": "Gate fails",
+      "variant": "security"
+    },
+    {
+      "id": "e4",
+      "from": "guard",
+      "to": "intent",
+      "label": "LIVE validated size",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e5",
+      "from": "guard",
+      "to": "paper",
+      "label": "PAPER size + price",
+      "variant": "dashed"
+    },
+    {
+      "id": "e6",
+      "from": "intent",
+      "to": "submit",
+      "label": "UUID + limit + side",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e7",
+      "from": "submit",
+      "to": "ack",
+      "label": "Order ID",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e8",
+      "from": "ack",
+      "to": "poll",
+      "label": "ID + symbol",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e9",
+      "from": "submit",
+      "to": "unknown",
+      "label": "Exception",
+      "variant": "security"
+    },
+    {
+      "id": "e10",
+      "from": "unknown",
+      "to": "poll",
+      "label": "Client ID lookup",
+      "variant": "dashed"
+    },
+    {
+      "id": "e11",
+      "from": "poll",
+      "to": "fill",
+      "label": "New qty / cost / fees",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e12",
+      "from": "poll",
+      "to": "terminal",
+      "label": "REJECTED / CANCELED",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Success and accounting",
+      "items": [
+        "Acknowledgement is not a fill: query cumulative execution totals.",
+        "Partial fills book deltas atomically; canceled IOC may still have fills."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Recovery and limits",
+      "items": [
+        "No submission retry. Poll every 30s; unresolved orders block live execution.",
+        "Source details, guard inventory and gaps: order-flow-evidence.md."
+      ]
+    }
+  ]
+}

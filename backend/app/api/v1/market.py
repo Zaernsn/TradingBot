@@ -11,7 +11,7 @@ from app.ml.backtest import BacktestEngine
 
 router = APIRouter(prefix="/market", tags=["market"])
 
-CURATED_PAIRS = ["BTC/EUR", "ETH/EUR", "SOL/EUR", "XRP/EUR", "ADA/EUR"]
+from app.exchanges.universe import CURATED_PAIRS, SUPPORTED_PAIRS
 
 
 @router.get("/pairs")
@@ -33,6 +33,8 @@ async def get_price(symbol: str):
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+    finally:
+        await exchange.close()
 
 
 @router.get("/ohlcv/{symbol:path}")
@@ -53,20 +55,35 @@ async def get_ohlcv(symbol: str, timeframe: str = "1h", limit: int = 100):
         ]
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+    finally:
+        await exchange.close()
 
 
 @router.post("/backtest", response_model=BacktestResult)
-async def run_backtest(request: BacktestRequest):
+async def run_backtest(request: BacktestRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    import asyncio
+    from app.services.market_data import load_history
+    from app.ml.backtest import PortfolioBacktestEngine
+    symbols = CURATED_PAIRS if request.symbol == "PORTFOLIO" else [request.symbol]
+    if any(symbol not in SUPPORTED_PAIRS for symbol in symbols):
+        raise HTTPException(status_code=422, detail="Choose a supported EUR pair or PORTFOLIO (core portfolio)")
     exchange = PaperExchange()
     try:
-        candles = await exchange.get_ohlcv(request.symbol, timeframe="1h", limit=2000)
-        engine = BacktestEngine(candles, initial_cash=request.initial_cash, fee_pct=request.fee_pct)
-        result = engine.run(horizon=12)
+        hourly = {s: await load_history(db, exchange, s) for s in symbols}
+        daily = {s: await load_history(db, exchange, s, '1d', limit=720) for s in symbols}
+        from app.services.risk_service import get_risk_config, risk_manager_from_config
+        risk = risk_manager_from_config(get_risk_config(db, current_user.id)) if request.use_saved_risk else None
+        engine = PortfolioBacktestEngine(hourly, initial_cash=request.initial_cash, fee_pct=request.fee_pct,
+            slippage_pct=request.slippage_pct,daily_by_symbol=daily,select_assets=request.symbol=="PORTFOLIO",
+            start_date=request.start_date,end_date=request.end_date,
+            risk=risk,
+            max_open_positions=request.max_open_positions if request.symbol=="PORTFOLIO" else 1)
+        result = await asyncio.to_thread(engine.run, horizon=risk.prediction_horizon if risk else request.prediction_horizon)
         result["symbol"] = request.symbol
-        # Convert timestamp index values to datetimes for serialization
-        for t in result["trades"]:
-            if not isinstance(t["timestamp"], datetime):
-                t["timestamp"] = datetime.fromtimestamp(t["timestamp"] / 1e9, tz=timezone.utc)
         return result
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=502, detail="Market data or backtest execution failed")
+    finally:
+        await exchange.close()

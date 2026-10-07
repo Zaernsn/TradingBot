@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://trader:traderpass@localhost:5432/tradingbot"
 
     ENABLE_LIVE_TRADING: bool = False
+    APP_PUBLIC_URL: str = "http://localhost:3000"
+    RESEND_API_KEY: str = ""
+    RESEND_FROM: str = ""
 
     KRAKEN_API_KEY: str = ""
     KRAKEN_API_SECRET: str = ""

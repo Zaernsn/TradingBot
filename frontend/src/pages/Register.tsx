@@ -7,17 +7,24 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    setError('');
+    setLoading(true);
     try {
       await authApi.register(email, password);
       const res = await authApi.login(email, password);
       localStorage.setItem('token', res.data.access_token);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Registration failed');
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((item: any) => item.msg).join('; ') : !err.response ? 'Cannot reach the backend. Check that Docker reports the backend as healthy.' : 'Registration failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,8 +88,8 @@ export default function Register() {
                   />
                 </div>
               </label>
-              <button className="btn-primary" type="submit" style={{ marginTop: '0.5rem' }}>
-                Create Account
+              <button className="btn-primary" type="submit" disabled={loading} aria-busy={loading} style={{ marginTop: '0.5rem' }}>
+                {loading ? 'Creating account…' : 'Create Account'}
                 <ArrowRight size={18} />
               </button>
             </form>

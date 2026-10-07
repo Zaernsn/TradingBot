@@ -26,6 +26,13 @@ def create_application() -> FastAPI:
     @app.on_event("startup")
     async def startup():
         Base.metadata.create_all(bind=engine)
+        from app.services.bot_service import bot_orchestrator
+        await bot_orchestrator.restore()
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        from app.services.bot_service import bot_orchestrator
+        await bot_orchestrator.shutdown()
 
     @app.get("/health")
     def health():

@@ -1,0 +1,14 @@
+.venv
+venv
+.env
+.env.*
+__pycache__
+.pytest_cache
+*.db
+*.sqlite*
+models
+tests
+research-results
+scripts
+pytest.ini
+requirements-dev.txt

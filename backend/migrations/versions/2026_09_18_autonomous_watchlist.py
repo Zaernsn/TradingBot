@@ -11,7 +11,8 @@ depends_on = None
 def upgrade():
     op.add_column("risk_configs", sa.Column("max_open_positions", sa.Integer, nullable=False, server_default="5"))
     op.add_column("risk_configs", sa.Column("allocation_mode", sa.String, nullable=False, server_default="equal"))
-    op.alter_column("risk_configs", "trading_pair", nullable=True)
+    with op.batch_alter_table("risk_configs") as batch:
+        batch.alter_column("trading_pair", existing_type=sa.String(), nullable=True)
 
     op.add_column("bot_states", sa.Column("watchlist", sa.JSON, nullable=True))
     op.add_column("bot_states", sa.Column("watchlist_updated_at", sa.DateTime(timezone=True), nullable=True))
@@ -27,6 +28,8 @@ def downgrade():
     op.drop_column("portfolios", "target_positions")
     op.drop_column("bot_states", "watchlist_updated_at")
     op.drop_column("bot_states", "watchlist")
-    op.alter_column("risk_configs", "trading_pair", nullable=False)
+    op.execute(sa.text("UPDATE risk_configs SET trading_pair = 'BTC/EUR' WHERE trading_pair IS NULL"))
+    with op.batch_alter_table("risk_configs") as batch:
+        batch.alter_column("trading_pair", existing_type=sa.String(), nullable=False)
     op.drop_column("risk_configs", "allocation_mode")
     op.drop_column("risk_configs", "max_open_positions")

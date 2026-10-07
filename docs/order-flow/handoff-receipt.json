@@ -1,0 +1,11 @@
+{
+  "diagram_type": "workflow",
+  "output": "C:/Users/danie/trading-bot/docs/order-flow/order-flow.html",
+  "specification_sha256": "9f973d6bc3ff3778e1e257e406b3444b0de52ca1645ce460e12433faf1cfee19",
+  "artifact_sha256": "6d68fba00869468c7d21abb6ac1a6f73f964af03dcd367ae50c7e5fef21ada63",
+  "validation": "9/9 showcase, 0 errors, 0 warnings",
+  "browser_evidence": "passed",
+  "visual_review": "passed",
+  "visual_review_scope": "Rendered screenshots: 1440x900 light and 2048x1320 dark; layout, labels and routes inspected. Interactive controls not manually exercised.",
+  "correction_rounds": 1
+}

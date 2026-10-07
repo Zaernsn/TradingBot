@@ -42,3 +42,12 @@ secrets/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local configuration and model artifacts
+.env
+.env.*
+!.env.example
+!*.env.example
+models/
+backend/models/
+backups/

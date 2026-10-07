@@ -15,7 +15,7 @@ def test_risk_config_defaults():
     db.commit()
     db.refresh(config)
 
-    assert config.max_open_positions == 5
+    assert config.max_open_positions == 20
     assert config.allocation_mode == "equal"
     assert config.trading_pair is None
     db.close()
@@ -48,5 +48,5 @@ def test_portfolio_target_positions_default():
     db.commit()
     db.refresh(portfolio)
 
-    assert portfolio.target_positions == 5
+    assert portfolio.target_positions == 20
     db.close()

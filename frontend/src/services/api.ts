@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = (import.meta.env.VITE_API_URL || '/').replace(/\/$/, '');
 
 const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
@@ -31,6 +31,8 @@ api.interceptors.response.use(
 export default api;
 
 export const authApi = {
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token: string, password: string) => api.post('/auth/reset-password', { token, password }),
   login: (email: string, password: string) =>
     api.post('/auth/login', new URLSearchParams({ username: email, password }), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -40,6 +42,7 @@ export const authApi = {
 };
 
 export const portfolioApi = {
+  getOrders: () => api.get('/portfolio/orders'),
   getPortfolio: () => api.get('/portfolio/me'),
   getPositions: () => api.get('/portfolio/positions'),
   getTrades: () => api.get('/portfolio/trades'),
@@ -57,21 +60,44 @@ export const marketApi = {
 
 export const botApi = {
   getState: () => api.get('/bot/state'),
+  getResearchStatus: () => api.get('/bot/research/status'),
+  exportResearchMetadata: () => api.get('/bot/research/metadata/export'),
+  importResearchMetadata: (payload: unknown) => api.post('/bot/research/metadata/import', payload),
   start: () => api.post('/bot/start'),
   stop: () => api.post('/bot/stop'),
   emergencyStop: () => api.post('/bot/emergency-stop'),
 };
 
 export const settingsApi = {
+  resumeRisk: () => api.post('/settings/resume-risk?confirm=true'),
   getRisk: () => api.get('/settings/risk'),
   updateRisk: (data: Partial<{
-    max_position_pct: number;
+    entry_strategy: 'model' | 'momentum' | 'fast_momentum' | 'auto';
+    buy_probability_threshold: number;
+    max_invest_per_trade_eur: number;
+    risk_per_trade_pct: number;
+    discovery_limit: number;
+    watchlist_limit: number;
+    max_holding_hours: number;
+  max_position_pct: number;
     stop_loss_pct: number;
     take_profit_pct: number;
     fee_pct: number;
     max_daily_trades: number;
-    trading_pair: string;
+    max_open_positions: number;
+    allocation_mode: "equal";
     prediction_horizon: number;
+    max_drawdown_pct: number;
+    max_total_exposure_pct: number;
+    max_correlated_exposure_pct: number;
+    correlation_threshold: number;
+    slippage_pct: number;
+    memecoins_enabled: boolean;
+    memecoin_max_position_pct: number;
+    memecoin_max_exposure_pct: number;
+    memecoin_max_spread_pct: number;
+    memecoin_min_daily_volume_eur: number;
+
   }>) => api.put('/settings/risk', data),
   resetPaper: () => api.post('/settings/reset-paper?confirm=true'),
   getSafety: () => api.get('/settings/safety'),

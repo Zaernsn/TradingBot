@@ -51,11 +51,20 @@ class OrderResult:
     avg_price: float
     fee: float
     raw_response: Optional[Dict[Any, Any]] = None
+    cost: Optional[float] = None
+    base_fee: float = 0.0
 
 
 class ExchangeInterface(ABC):
     name: str = "base"
     is_live: bool = False
+
+    async def get_curated_pairs(self) -> List[str]:
+        from app.exchanges.universe import CURATED_PAIRS
+        return list(CURATED_PAIRS)
+
+    async def close(self):
+        pass
 
     @abstractmethod
     async def get_ticker(self, symbol: str) -> Ticker:

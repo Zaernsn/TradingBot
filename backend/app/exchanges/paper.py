@@ -21,6 +21,9 @@ class PaperExchange(ExchangeInterface):
     def __init__(self):
         self.market = KrakenExchange(api_key="", api_secret="")
 
+    async def close(self):
+        await self.market.close()
+
     async def get_ticker(self, symbol: str) -> Ticker:
         return await self.market.get_ticker(symbol)
 

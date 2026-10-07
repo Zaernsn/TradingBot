@@ -1,119 +1,82 @@
-from datetime import datetime, timezone
-from typing import Optional
-from sqlalchemy.orm import Session
-from app.models.portfolio import Portfolio, Position, Trade
-from app.exchanges.base import ExchangeInterface, OrderSide
+"""Accounting shared by simulated fills and reconciled exchange fills."""
+from math import isfinite
+from app.models.portfolio import Position, Trade
+from app.exchanges.base import OrderSide
 from app.services.portfolio_service import get_position, recalculate_equity
-from app.services.risk_service import RiskManager
 
 
-def execute_paper_trade(
-    db: Session,
-    portfolio: Portfolio,
-    exchange: ExchangeInterface,
-    symbol: str,
-    side: OrderSide,
-    quantity: float,
-    price: float,
-    fee_pct: float,
-    slippage_pct: float = 0.001,
-    reason: Optional[str] = None,
-) -> Trade:
-    """Simulate a market order including slippage and fees."""
-    slippage = price * slippage_pct if side == OrderSide.BUY else -price * slippage_pct
-    fill_price = price + slippage
-    gross = fill_price * quantity
-    fee = gross * fee_pct
-    total_cost = gross + fee if side == OrderSide.BUY else gross - fee
-
-    position = get_position(db, portfolio.id, symbol)
-
+def record_fill(db, portfolio, symbol, side, quantity, fill_price, fee, market_price,
+                reason=None, base_fee=0., commit=True):
+    if any(not isfinite(v) for v in [quantity,fill_price,fee,market_price,base_fee]):
+        raise ValueError('Non-finite fill')
+    if quantity <= 0 or fill_price <= 0 or market_price <= 0 or fee < 0 or base_fee < 0:
+        raise ValueError('Invalid fill')
+    gross=quantity*fill_price
+    position=get_position(db,portfolio.id,symbol)
+    realized=None
     if side == OrderSide.BUY:
-        if total_cost > portfolio.cash:
-            raise ValueError("Insufficient cash for trade")
-        if position:
-            total_qty = position.quantity + quantity
-            position.avg_entry_price = (
-                position.avg_entry_price * position.quantity + fill_price * quantity
-            ) / total_qty
-            position.quantity = total_qty
-        else:
-            position = Position(
-                portfolio_id=portfolio.id,
-                symbol=symbol,
-                quantity=quantity,
-                avg_entry_price=fill_price,
-                current_price=fill_price,
-            )
+        received=quantity-base_fee
+        if received <= 0 or gross+fee > portfolio.cash+1e-7:
+            raise ValueError('Insufficient cash or invalid net filled quantity')
+        if position is None:
+            position=Position(portfolio_id=portfolio.id,symbol=symbol,quantity=0.,avg_entry_price=0.,
+                              current_price=market_price,entry_fees=0.,realized_pnl=0.)
             db.add(position)
-        portfolio.cash -= total_cost
+        total=position.quantity+received
+        position.avg_entry_price=(position.avg_entry_price*position.quantity+gross)/total
+        position.quantity=total
+        position.entry_fees=(position.entry_fees or 0.)+fee
+        portfolio.cash-=gross+fee
     else:
-        if not position or position.quantity < quantity:
-            raise ValueError("Insufficient position to sell")
-        realized = (fill_price - position.avg_entry_price) * quantity - fee
-        position.realized_pnl += realized
-        position.quantity -= quantity
-        position.unrealized_pnl = (fill_price - position.avg_entry_price) * position.quantity
-        portfolio.cash += total_cost
-        if position.quantity <= 1e-9:
-            db.delete(position)
-
-    trade = Trade(
-        portfolio_id=portfolio.id,
-        symbol=symbol,
-        side=side.value,
-        quantity=quantity,
-        price=fill_price,
-        fee=fee,
-        slippage=slippage,
-        total_cost=total_cost,
-        pnl=realized if side == OrderSide.SELL else None,
-        mode=portfolio.mode,
-        reason=reason,
-    )
+        disposed=quantity+base_fee
+        if position is None or disposed > position.quantity+1e-10:
+            raise ValueError('Exchange sold more assets than the local position; reconciliation required')
+        allocated=(position.entry_fees or 0.)*min(1.,disposed/position.quantity)
+        realized=gross-fee-position.avg_entry_price*disposed-allocated
+        position.realized_pnl+=realized
+        position.entry_fees=max(0.,(position.entry_fees or 0.)-allocated)
+        position.quantity=max(0.,position.quantity-disposed)
+        portfolio.cash+=gross-fee
+    position.current_price=market_price
+    position.unrealized_pnl=(market_price-position.avg_entry_price)*position.quantity-position.entry_fees
+    if position.quantity <= 1e-12:
+        db.delete(position)
+    trade=Trade(portfolio_id=portfolio.id,symbol=symbol,side=side.value,quantity=quantity,
+                price=fill_price,fee=fee,slippage=fill_price-market_price,
+                total_cost=gross+fee if side==OrderSide.BUY else gross-fee,pnl=realized,
+                mode=portfolio.mode,reason=reason)
     db.add(trade)
-    recalculate_equity(db, portfolio)
-    db.refresh(trade)
+    db.flush()
+    positions=db.query(Position).filter(Position.portfolio_id==portfolio.id).all()
+    portfolio.equity=portfolio.cash+sum(p.quantity*p.current_price for p in positions)
+    if commit:
+        db.commit(); db.refresh(trade)
     return trade
 
 
-def apply_stop_loss_take_profit(
-    db: Session,
-    portfolio: Portfolio,
-    exchange: ExchangeInterface,
-    risk: RiskManager,
-    symbol: str,
-    current_price: float,
-) -> Optional[Trade]:
-    position = get_position(db, portfolio.id, symbol)
-    if not position or position.quantity <= 0:
-        return None
+def execute_paper_trade(db,portfolio,exchange,symbol,side,quantity,price,fee_pct,
+                        slippage_pct=.001,reason=None):
+    if portfolio.mode != 'PAPER' or portfolio.book_type != 'PAPER':
+        raise ValueError('Paper execution requires a PAPER book')
+    fill=price*(1+slippage_pct if side==OrderSide.BUY else 1-slippage_pct)
+    return record_fill(db,portfolio,symbol,side,quantity,fill,fill*quantity*fee_pct,price,reason)
 
-    stop = position.avg_entry_price * (1 - risk.stop_loss_pct)
-    target = position.avg_entry_price * (1 + risk.take_profit_pct)
 
-    if current_price <= stop:
-        return execute_paper_trade(
-            db,
-            portfolio,
-            exchange,
-            symbol,
-            OrderSide.SELL,
-            position.quantity,
-            current_price,
-            risk.fee_pct,
-            reason=f"Stop-loss hit at {current_price:.2f}",
-        )
-    if current_price >= target:
-        return execute_paper_trade(
-            db,
-            portfolio,
-            exchange,
-            symbol,
-            OrderSide.SELL,
-            position.quantity,
-            current_price,
-            risk.fee_pct,
-            reason=f"Take-profit hit at {current_price:.2f}",
-        )
+def exit_reason(position,risk,price,now=None):
+    if price <= position.avg_entry_price*(1-risk.stop_loss_pct): return 'Stop-loss'
+    if price >= position.avg_entry_price*(1+risk.take_profit_pct): return 'Take-profit'
+    if getattr(risk,'max_holding_hours',0) and getattr(position,'opened_at',None):
+        from datetime import datetime, timezone, timedelta
+        from app.services.market_data import utc
+        if utc(now or datetime.now(timezone.utc))-utc(position.opened_at)>=timedelta(hours=risk.max_holding_hours):
+            return 'Maximum holding period'
     return None
+
+
+def apply_stop_loss_take_profit(db,portfolio,exchange,risk,symbol,current_price):
+    position=get_position(db,portfolio.id,symbol)
+    if not position or position.quantity <= 0: return None
+    reason=exit_reason(position,risk,current_price)
+    if reason:
+        return execute_paper_trade(db,portfolio,exchange,symbol,OrderSide.SELL,position.quantity,
+                                   current_price,risk.fee_pct,slippage_pct=risk.slippage_pct,reason=reason)
