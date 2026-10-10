@@ -73,6 +73,19 @@ export interface EntryDecision {
 }
 
 export interface BotState {
+  market_data_status?: { connected: boolean; subscriptions: number; reconnects: number; rest_requests: number } | null;
+  protection_status?: {
+    status: string;
+    last_checked_at?: string;
+    last_success_at?: string;
+    duration_seconds: number;
+    interval_seconds: number;
+    target_seconds: number;
+    oldest_quote_seconds: number | null;
+    checked_positions: number;
+    delayed_cycles: number;
+    failures: Record<string, string>;
+  } | null;
   entry_decisions?: Record<string, EntryDecision>;
   blocker_summary?: Record<string, number>;
   discovery_stats?: { discovered?: number; quoted?: number; market_eligible?: number; retained?: number; history_eligible?: number; model_qualified?: number; buy_candidates?: number; quote_requests?: number; quote_failures?: number; scan_seconds?: number; cycle_seconds?: number; watchlist_churn?: number; checked_at?: string; coverage?: string } | null;

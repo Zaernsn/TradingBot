@@ -94,7 +94,7 @@ class KrakenExchange(ExchangeInterface):
         await self.client.close()
 
     async def get_ticker(self, symbol: str) -> Ticker:
-        ticker = await self.client.fetch_ticker(symbol)
+        ticker = await self.get_market_ticker(symbol)
         return Ticker(
             symbol=symbol,
             bid=ticker.get("bid"),
@@ -104,7 +104,14 @@ class KrakenExchange(ExchangeInterface):
             timestamp=datetime.fromtimestamp(ticker["timestamp"] / 1000, tz=timezone.utc)
             if ticker.get("timestamp")
             else datetime.now(timezone.utc),
+            source=ticker.get('source','rest'),
         )
+
+    async def get_market_ticker(self,symbol):
+        from app.services.market_stream import market_stream
+        if market_stream is not None:
+            return await market_stream.get('ticker',symbol,lambda:self.client.fetch_ticker(symbol))
+        return await self.client.fetch_ticker(symbol)
 
     async def get_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 100) -> List[OHLCV]:
         candles = await self.client.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
@@ -238,6 +245,9 @@ class KrakenExchange(ExchangeInterface):
         return {'taker':taker}
 
     async def get_order_book(self, symbol):
+        from app.services.market_stream import market_stream
+        if market_stream is not None:
+            return await market_stream.get('book',symbol,lambda:self.client.fetch_order_book(symbol,limit=100))
         return await self.client.fetch_order_book(symbol, limit=100)
 
     async def open_orders(self):

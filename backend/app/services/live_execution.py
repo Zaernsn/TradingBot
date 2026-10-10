@@ -115,7 +115,7 @@ async def reconcile_all(db,portfolio,exchange,cancel=False):
 
 async def verify_balances(db,portfolio,exchange, *, sync_cash=False):
     balances=await exchange.get_balances()
-    positions=db.query(Position).filter(Position.portfolio_id==portfolio.id,Position.quantity>0).all()
+    positions=db.query(Position).filter(Position.portfolio_id==portfolio.id,Position.quantity>0).populate_existing().all()
     expected={p.symbol.split('/')[0]:p.quantity for p in positions}
     for base in (set(balances) | set(expected)) - {'EUR'}:
         actual=float(balances.get(base,0) or 0)

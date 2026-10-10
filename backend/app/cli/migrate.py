@@ -35,7 +35,7 @@ def migrate():
             }
             observed={t:{c['name'] for c in inspector.get_columns(t)} for t in legacy}
             later['risk_configs'].update({'risk_per_trade_pct','max_holding_hours','discovery_limit','watchlist_limit','entry_strategy','buy_probability_threshold'})
-            later['bot_states'].update({'entry_decisions','candidate_status','discovery_stats'})
+            later['bot_states'].update({'entry_decisions','candidate_status','discovery_stats','protection_status'})
             expected={t:set(Base.metadata.tables[t].columns.keys())-later.get(t,set()) for t in legacy}
             revision='9e9b4ef6f510'
             if observed!=expected:

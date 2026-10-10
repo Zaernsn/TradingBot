@@ -24,7 +24,9 @@ Autonomous multi-asset paper trading and explicit opt-in Kraken spot execution. 
 
 Copy `.env.example` to `.env`, set strong secrets, and run `docker compose up --build`. Open `http://localhost:3000`. Both Compose configurations automatically apply pending database migrations before starting the backend, including updates to existing databases. When starting the backend directly outside Docker, run `python -m app.cli.migrate` from `backend/` first. Use `backend/.venv` for the prepared local Python environment.
 
-The bot refreshes its crypto and memecoin watchlist every five minutes (daily in core-only mode), uses completed hourly signals, and monitors positions on nominal 30-second cycles. Configure slots, position/exposure caps, drawdown, fees and slippage in Settings.
+The bot refreshes its crypto and memecoin watchlist every five minutes (daily in core-only mode) and uses completed hourly signals on nominal 30-second entry cycles. A separate protective task checks holdings every five seconds during and between entry cycles, sharing the existing order/lease controls. Its 15-second timing target is monitored, not guaranteed. The dashboard shows stale checks and quote failures; these block new entries while exits remain available. Configure slots, position/exposure caps, drawdown, fees and slippage in Settings.
+
+Public market data uses a shared Kraken WebSocket ticker and checksum-validated 100-level book cache, with expiring data and bounded REST fallback. Migration `n61010protection` adds persistent monitoring diagnostics; normal container startup applies it. See [the improvement roadmap](docs/NEXT_IMPROVEMENTS.md) for implementation status and remaining work.
 
 ## Live trading
 

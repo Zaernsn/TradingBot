@@ -66,6 +66,8 @@ class SignalOut(BaseModel):
 
 
 class BotStateOut(BaseModel):
+    market_data_status: Optional[dict] = None
+    protection_status: Optional[dict] = None
     discovery_stats: Optional[dict] = None
     candidate_status: Optional[dict] = None
     blocker_summary: dict[str, int] = Field(default_factory=dict)
@@ -158,6 +160,7 @@ class RiskConfigUpdate(BaseModel):
 
 
 class MarketPrice(BaseModel):
+    source: str = 'rest'
     symbol: str
     price: float
     bid: Optional[float]

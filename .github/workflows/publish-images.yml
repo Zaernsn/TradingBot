@@ -33,6 +33,7 @@ jobs:
               tests/test_autonomous_api.py tests/test_fast_meme_policy.py
               tests/test_fast_momentum.py tests/test_memecoins.py
               tests/test_drift_recovery.py tests/test_forward_and_hints.py
+              tests/test_position_monitor.py tests/test_market_stream.py
           - group: execution
             tests: >-
               tests/test_account_overview.py tests/test_cash_reconciliation.py

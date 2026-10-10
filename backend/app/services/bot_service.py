@@ -11,8 +11,8 @@ from app.exchanges.paper import PaperExchange
 from app.exchanges.base import OrderSide
 from app.exchanges.universe import CURATED_PAIRS, is_memecoin, WATCHLIST_LIMIT
 from app.services.memecoin_service import LiquidityLimitError, eligible_universe, check_liquidity, memecoin_budget
-from app.services.portfolio_service import get_or_create_portfolio, recalculate_equity, update_position_price, get_position
-from app.services.trading_service import execute_paper_trade, exit_reason
+from app.services.portfolio_service import get_or_create_portfolio, recalculate_equity, get_position
+from app.services.trading_service import execute_paper_trade
 from app.services.risk_service import get_risk_config, risk_manager_from_config, entry_budget, check_drawdown
 from app.services.asset_selector import AssetSelector
 from app.services.market_data import load_history, utc
@@ -58,6 +58,10 @@ class BotOrchestrator:
         self.models={}
         self.selector=AssetSelector()
         self._locks={}
+        self._order_locks={}
+        self._monitor_locks={}
+        self._cycle_exits={}
+        self.monitor_interval=5
         self.trainer=ModelTrainer(lambda name: SignalModel(name=name, persist=False),
             alternate_factory=lambda name: SignalModel(name=name, persist=False, feature_schema='normalized-v1'))
 
@@ -90,8 +94,32 @@ class BotOrchestrator:
             self.scheduler.add_job(self._run_iteration,IntervalTrigger(seconds=30),id=job,
                 args=[user_id,portfolio_id,risk_id],max_instances=1,misfire_grace_time=30,
                 next_run_time=datetime.now(timezone.utc))
+        monitor_job=f'protection_{user_id}'
+        if not self.scheduler.get_job(monitor_job):
+            self.scheduler.add_job(self._run_monitor_iteration,IntervalTrigger(seconds=self.monitor_interval),
+                id=monitor_job,args=[user_id,portfolio_id,risk_id],max_instances=1,
+                misfire_grace_time=5)
+
+    async def _run_monitor_iteration(self,user_id,portfolio_id,risk_config_id):
+        """Protect between entry cycles; active entry cycles run their own monitor under the same lease."""
+        from app.db.session import SessionLocal
+        from app.services.position_monitor import monitor_open_positions
+        lock=self._locks.setdefault(user_id,asyncio.Lock())
+        if lock.locked(): return
+        async with lock:
+            with SessionLocal() as db: token=lease.acquire(db,user_id)
+            if not token: return
+            heartbeat=asyncio.create_task(self._heartbeat(user_id,token))
+            try:
+                await monitor_open_positions(self,user_id,token,set())
+            finally:
+                heartbeat.cancel()
+                with contextlib.suppress(asyncio.CancelledError): await heartbeat
+                with SessionLocal() as db: lease.release(db,user_id,token)
 
     async def restore(self):
+        from app.services.market_stream import start_market_stream
+        start_market_stream()
         if not self.scheduler.running: self.scheduler.start()
         self.scheduler.add_job(self.sweep,IntervalTrigger(seconds=30),id='restore_bots',replace_existing=True,max_instances=1)
         self.scheduler.add_job(self.research_strategies,IntervalTrigger(hours=1),id='strategy_research',
@@ -139,13 +167,16 @@ class BotOrchestrator:
                     config=get_risk_config(db,state.user_id)
                     self._sync_watchlist_policy(db,state,book,config)
                     self._schedule(state.user_id,book.id,config.id)
-                elif self.scheduler.get_job(f'bot_{state.user_id}'):
-                    self.scheduler.remove_job(f'bot_{state.user_id}')
+                else:
+                    for job_id in (f'bot_{state.user_id}',f'protection_{state.user_id}'):
+                        if self.scheduler.get_job(job_id): self.scheduler.remove_job(job_id)
 
     async def shutdown(self):
         await self.trainer.close()
         if self.scheduler.running: self.scheduler.shutdown(wait=False)
         self.scheduler=AsyncIOScheduler()
+        from app.services.market_stream import close_market_stream
+        await close_market_stream()
 
     async def start(self,db,user):
         state=db.query(BotState).filter(BotState.user_id==user.id).first()
@@ -178,8 +209,9 @@ class BotOrchestrator:
             config=get_risk_config(db,user.id)
             if not self.scheduler.running: self.scheduler.start()
             self._schedule(user.id,book.id,config.id)
-        elif self.scheduler.get_job(f'bot_{user.id}'):
-            self.scheduler.remove_job(f'bot_{user.id}')
+        else:
+            for job_id in (f'bot_{user.id}',f'protection_{user.id}'):
+                if self.scheduler.get_job(job_id): self.scheduler.remove_job(job_id)
         return state
 
     async def emergency_stop(self,db,user):
@@ -205,6 +237,7 @@ class BotOrchestrator:
         async with lock:
             with SessionLocal() as db: token=lease.acquire(db,user_id)
             if not token: return
+            self._cycle_exits[(user_id,token)]=set()
             heartbeat=asyncio.create_task(self._heartbeat(user_id,token))
             try:
                 await self._iterate(user_id,token)
@@ -212,6 +245,7 @@ class BotOrchestrator:
                 heartbeat.cancel()
                 with contextlib.suppress(asyncio.CancelledError): await heartbeat
                 with SessionLocal() as db: lease.release(db,user_id,token)
+                self._cycle_exits.pop((user_id,token),None)
 
     def _running(self,db,state,portfolio,token):
         db.refresh(state); db.refresh(portfolio)
@@ -231,9 +265,33 @@ class BotOrchestrator:
                 with contextlib.suppress(asyncio.CancelledError): await task
 
     async def _execution(self,db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key=None):
+        # The monitor and strategy share the lease, but serialize every ledger/order
+        # operation inside that ownership. Refresh quantities after acquiring it.
+        async with self._order_locks.setdefault(user.id,asyncio.Lock()):
+            return await self._execute_locked(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key)
+
+    async def _execute_locked(self,db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key=None):
         state=db.query(BotState).filter(BotState.user_id==user.id).first()
         if not self._running(db,state,portfolio,token): return
+        if side==OrderSide.SELL:
+            position=db.query(Position).filter(Position.portfolio_id==portfolio.id,
+                Position.symbol==symbol,Position.quantity>0).populate_existing().first()
+            if not position: return
+            quantity=min(quantity,position.quantity)
         if side==OrderSide.BUY:
+            if symbol in self._cycle_exits.get((user.id,token),set()):
+                raise ValueError('Position exited during this cycle; waiting for a new entry evaluation')
+            if portfolio.risk_halted:
+                raise ValueError('Drawdown limit reached; new entries are paused')
+            protection=state.protection_status or {}
+            if protection.get('failures'):
+                raise ValueError('New entries paused: protective monitoring needs attention')
+            if protection.get('last_checked_at'):
+                from app.services.position_monitor import MONITOR_TARGET_SECONDS
+                age=(datetime.now(timezone.utc)-datetime.fromisoformat(protection['last_checked_at'])).total_seconds()
+                if age>MONITOR_TARGET_SECONDS and db.query(Position.id).filter(
+                        Position.portfolio_id==portfolio.id,Position.quantity>0).first():
+                    raise ValueError('New entries paused: protective monitoring is overdue')
             latest_config=get_risk_config(db,user.id); db.refresh(latest_config)
             cap=latest_config.max_invest_per_trade_eur
             effective_fee=max(float(latest_config.fee_pct),float(risk.fee_pct))
@@ -243,16 +301,16 @@ class BotOrchestrator:
             latest_config=get_risk_config(db,user.id); db.refresh(latest_config)
             current_risk=risk_manager_from_config(latest_config)
             risk=replace(current_risk,fee_pct=max(current_risk.fee_pct,risk.fee_pct))
-            positions=db.query(Position).filter(Position.portfolio_id==portfolio.id,Position.quantity>0).all()
+            positions=db.query(Position).filter(Position.portfolio_id==portfolio.id,Position.quantity>0).populate_existing().all()
             if quantity*price*(1+risk.slippage_pct)*(1+risk.fee_pct)>memecoin_budget(portfolio,risk,symbol,positions)+1e-7:
                 raise ValueError('Memecoin allocation changed or its exposure cap was reached')
             await check_liquidity(exchange,symbol,risk)
         if portfolio.book_type=='LIVE':
             await verify_balances(db,portfolio,exchange)
-            await execute_live(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,
+            return await execute_live(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,
                                intent_key=intent_key)
         else:
-            execute_paper_trade(db,portfolio,exchange,symbol,side,quantity,price,risk.fee_pct,
+            return execute_paper_trade(db,portfolio,exchange,symbol,side,quantity,price,risk.fee_pct,
                                 slippage_pct=risk.slippage_pct,reason=reason)
 
     async def _iterate(self,user_id,token):
@@ -260,6 +318,8 @@ class BotOrchestrator:
         iteration_started=time.monotonic()
         from app.db.session import SessionLocal
         db=SessionLocal(); state=None; exchange=None; portfolio=None; errors=[]; decisions={}
+        monitor_task=None
+        monitor_stop=asyncio.Event()
         def explain(symbol, code, message):
             decisions[symbol]={**decisions.get(symbol,{}),'code':code,'message':message,'checked_at':datetime.now(timezone.utc).isoformat()}
         def explain_retry(symbol, code, exc, signal_id):
@@ -295,6 +355,11 @@ class BotOrchestrator:
             evaluated_strategy=risk.entry_strategy
             portfolio.target_positions=risk.max_open_positions
             now=datetime.now(timezone.utc)
+            histories={}; quotes={}; exited=self._cycle_exits.setdefault((user_id,token),set()); predictions={}
+            from app.services.position_monitor import monitor_loop, monitor_open_positions
+            db.commit()
+            await monitor_open_positions(self,user_id,token,exited)
+            monitor_task=asyncio.create_task(monitor_loop(self,user_id,token,exited,monitor_stop))
             if live:
                 verified_at=utc(config.verified_taker_fee_at) if config.verified_taker_fee_at else None
                 try:
@@ -317,50 +382,24 @@ class BotOrchestrator:
             held=db.query(Position).filter(Position.portfolio_id==portfolio.id,Position.quantity>0).all()
             watchlist,watchlist_policy_changed=self._sync_watchlist_policy(db,state,portfolio,risk,held)
             symbols=list(dict.fromkeys([p.symbol for p in held]+watchlist))
-            histories={}; quotes={}; exited=set(); predictions={}
             async def protect():
+                # The dedicated task runs during ALL awaits; no shared Session is
+                # passed to it, including during history ingestion or model work.
                 if not self._running(db,state,portfolio,token):
                     raise ValueError('Bot stopped or execution lease expired during data refresh')
-                db.refresh(config)
-                protective_risk=risk_manager_from_config(config)
-                positions=db.query(Position).filter(Position.portfolio_id==portfolio.id,Position.quantity>0).all()
-                semaphore=asyncio.Semaphore(4)
-                async def quote(position):
-                    async with semaphore:
-                        return await asyncio.wait_for(exchange.get_ticker(position.symbol),timeout=10)
-                results=await asyncio.gather(*(quote(p) for p in positions),return_exceptions=True)
-                for position,ticker in zip(positions,results):
-                    if isinstance(ticker,Exception):
-                        errors.append(f'{position.symbol}: protective quote unavailable'); continue
-                    price=float(ticker.last)
-                    if not math.isfinite(price) or price<=0: continue
-                    update_position_price(db,portfolio,position.symbol,price)
-                    reason=exit_reason(position,protective_risk,price)
-                    if reason:
-                        await self._execution(db,portfolio,user,exchange,position.symbol,OrderSide.SELL,
-                            position.quantity,ticker.bid or price,protective_risk,token,reason)
-                        exited.add(position.symbol)
-                recalculate_equity(db,portfolio)
-                check_drawdown(portfolio,protective_risk); db.commit()
             # Monitor every existing position before doing any CPU-heavy training.
             for symbol in symbols:
+                if symbol in exited: continue
                 try:
                     ticker=await asyncio.wait_for(exchange.get_ticker(symbol),timeout=10)
                     price=float(ticker.last)
                     if not math.isfinite(price) or price<=0: raise ValueError('Invalid quote')
                     if not self._running(db,state,portfolio,token): return
                     quotes[symbol]=ticker
-                    update_position_price(db,portfolio,symbol,price)
-                    recalculate_equity(db,portfolio)
-                    position=get_position(db,portfolio.id,symbol)
-                    reason=exit_reason(position,risk,price) if position else None
-                    if reason:
-                        await self._execution(db,portfolio,user,exchange,symbol,OrderSide.SELL,position.quantity,
-                                              ticker.bid or price,risk,token,reason)
-                        exited.add(symbol)
                 except Exception as exc:
                     db.rollback(); errors.append(f'{symbol}: {exc}')
                     explain(symbol,'market_unavailable','Market quote unavailable; entry checks are paused.')
+            db.expire_all()
             recalculate_equity(db,portfolio)
             check_drawdown(portfolio,risk); db.commit()
             updated=utc(state.watchlist_updated_at) if state.watchlist_updated_at else None
@@ -413,7 +452,9 @@ class BotOrchestrator:
                     'last_successful_selection':state.watchlist_updated_at.isoformat() if state.watchlist_updated_at else None}
                 db.commit()
             watchlist=[s for s in state.watchlist or [] if s in CURATED_PAIRS or (risk.memecoins_enabled and is_memecoin(s))][:risk.watchlist_limit]
-            symbols=list(dict.fromkeys([p.symbol for p in held]+watchlist))
+            held_symbols=[row[0] for row in db.query(Position.symbol).filter(
+                Position.portfolio_id==portfolio.id,Position.quantity>0).all()]
+            symbols=list(dict.fromkeys(held_symbols+watchlist))
             for symbol in symbols:
                 if symbol in quotes or symbol in exited: continue
                 try:
@@ -560,8 +601,9 @@ class BotOrchestrator:
             for symbol,prediction in predictions.items():
                 position=get_position(db,portfolio.id,symbol)
                 if prediction['action']=='SELL' and position:
+                    quantity=position.quantity
                     ticker=await exchange.get_ticker(symbol)
-                    await self._execution(db,portfolio,user,exchange,symbol,OrderSide.SELL,position.quantity,
+                    await self._execution(db,portfolio,user,exchange,symbol,OrderSide.SELL,quantity,
                                           ticker.bid or ticker.last,risk,token,'Model exit')
             from app.services.entry_readiness import entry_readiness
             for symbol in watchlist:
@@ -728,6 +770,11 @@ class BotOrchestrator:
                     from app.services.strategy_research import review_live_canary
                     review_live_canary(db,user_id,critical_reason=str(exc)[:300])
         finally:
+            monitor_stop.set()
+            if monitor_task:
+                # Let an in-flight submission finish recording its outcome before
+                # releasing the lease. Never cancel a monitor to start another owner.
+                with contextlib.suppress(Exception): await monitor_task
             if exchange and portfolio and portfolio.book_type=='LIVE' and state:
                 db.refresh(state)
                 if not state.is_running:

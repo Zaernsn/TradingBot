@@ -31,6 +31,7 @@ class Ticker:
     last: float
     volume: Optional[float]
     timestamp: datetime
+    source: str = 'rest'
 
 
 @dataclass

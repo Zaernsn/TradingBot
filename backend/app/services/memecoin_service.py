@@ -25,7 +25,8 @@ async def eligible_universe(exchange, risk, diagnostics=None):
     async def inspect(symbol):
         try:
             async with limiter:
-                ticker = await asyncio.wait_for(adapter.client.fetch_ticker(symbol),timeout=10)
+                fetch=getattr(adapter,'get_market_ticker',adapter.client.fetch_ticker)
+                ticker = await asyncio.wait_for(fetch(symbol),timeout=10)
             turnover, spread = validate_liquidity(ticker, risk, enforce_limits=False)
             momentum = float(ticker.get('percentage') or 0)
             if not isfinite(momentum): momentum = 0
@@ -58,7 +59,8 @@ async def check_liquidity(exchange,symbol,risk):
     if not is_memecoin(symbol): return
     if not risk.memecoins_enabled: raise ValueError('Memecoin entries are disabled')
     adapter=exchange.market if hasattr(exchange,'market') else exchange
-    ticker=await adapter.client.fetch_ticker(symbol)
+    fetch=getattr(adapter,'get_market_ticker',adapter.client.fetch_ticker)
+    ticker=await fetch(symbol)
     return validate_liquidity(ticker, risk)
 
 

@@ -106,6 +106,7 @@ class BotState(Base):
     entry_decisions = Column(JSON, nullable=True)
     discovery_stats = Column(JSON, nullable=True)
     candidate_status = Column(JSON, nullable=True)
+    protection_status = Column(JSON, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 

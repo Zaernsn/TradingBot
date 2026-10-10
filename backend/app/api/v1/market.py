@@ -30,6 +30,7 @@ async def get_price(symbol: str):
             bid=ticker.bid,
             ask=ticker.ask,
             timestamp=ticker.timestamp,
+            source=ticker.source,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))

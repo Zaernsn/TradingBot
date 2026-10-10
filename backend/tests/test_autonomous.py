@@ -61,7 +61,7 @@ def setup_bot(monkeypatch):
     async def ohlcv(symbol,timeframe='1h',limit=100):
         return candles(objects=True,timeframe=timeframe,count=61)
     exchange = SimpleNamespace(get_ohlcv=AsyncMock(side_effect=ohlcv),
-                               get_ticker=AsyncMock(return_value=SimpleNamespace(last=100.0,bid=100.,ask=100.)), close=AsyncMock())
+                               get_ticker=AsyncMock(return_value=SimpleNamespace(last=100.0,bid=100.,ask=100.,timestamp=datetime.now(timezone.utc))), close=AsyncMock())
     actions = {}
     class Model:
         def __init__(self, name): self.name, self.is_fitted = name, True

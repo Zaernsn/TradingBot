@@ -58,6 +58,12 @@ def get_state(db: Session = Depends(get_db), current_user: User = Depends(get_cu
     ).count()
     if state.entry_decisions is None: state.entry_decisions = {}
     result = BotStateOut.model_validate(state)
+    from app.services.market_stream import market_stream
+    if market_stream is not None:
+        result.market_data_status={
+            'connected':market_stream.connected,'subscriptions':len(market_stream.desired),
+            'reconnects':market_stream.reconnects,'rest_requests':market_stream.rest_requests,
+        }
     result.watchlist_refresh_seconds = 300 if config.memecoins_enabled else 86400
     from app.exchanges.universe import CURATED_PAIRS, is_memecoin
     result.watchlist = [

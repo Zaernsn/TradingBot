@@ -279,6 +279,21 @@ export default function Dashboard() {
           <div className="text-muted mt-1" style={{ fontSize: '0.8rem' }}>
             Last run: {botState?.last_run_at ? formatDate(botState.last_run_at) : 'Never'}
           </div>
+          {botState?.protection_status && (() => {
+            const protection = botState.protection_status;
+            const checkedAt = protection.last_checked_at ? new Date(protection.last_checked_at).getTime() : 0;
+            const stale = !checkedAt || now - checkedAt > protection.target_seconds * 1000;
+            const label = !botState.is_running ? 'Stopped' : stale ? 'Check overdue' : protection.status;
+            return <div className="mt-1" role="status" style={{ fontSize: '0.82rem' }}>
+              <span>Position protection: {label} · checks every {protection.interval_seconds}s</span>
+              <div className="text-muted">Last check {protection.last_checked_at ? formatDate(protection.last_checked_at) : 'pending'} · {protection.duration_seconds.toFixed(1)}s duration · {protection.checked_positions} positions checked</div>
+              {botState.is_running && Object.entries(protection.failures).map(([symbol, message]) =>
+                <div key={symbol} className="text-danger">{symbol}: {message}</div>)}
+            </div>;
+          })()}
+          {botState?.market_data_status && <div className="text-muted mt-1" style={{ fontSize: '0.82rem' }}>
+            Market stream: {botState.market_data_status.connected ? 'Connected' : 'Reconnecting'} · {botState.market_data_status.subscriptions} markets · {botState.market_data_status.rest_requests} fallback requests
+          </div>}
         </div>
 
         <div className="card span-12">

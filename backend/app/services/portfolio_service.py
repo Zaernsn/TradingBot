@@ -42,7 +42,7 @@ def reset_paper_portfolio(db: Session, user_id: int) -> Portfolio:
 
 
 def get_position(db: Session, portfolio_id: int, symbol: str) -> Optional[Position]:
-    return db.query(Position).filter(Position.portfolio_id == portfolio_id, Position.symbol == symbol).first()
+    return db.query(Position).filter(Position.portfolio_id == portfolio_id, Position.symbol == symbol).populate_existing().first()
 
 
 def update_position_price(db: Session, portfolio: Portfolio, symbol: str, price: float):
@@ -56,7 +56,7 @@ def update_position_price(db: Session, portfolio: Portfolio, symbol: str, price:
 
 def recalculate_equity(db: Session, portfolio: Portfolio):
     db.flush()
-    positions = db.query(Position).filter(Position.portfolio_id == portfolio.id).all()
+    positions = db.query(Position).filter(Position.portfolio_id == portfolio.id).populate_existing().all()
     positions_value = sum(p.quantity * p.current_price for p in positions)
     portfolio.equity = portfolio.cash + positions_value
     portfolio.updated_at = datetime.now(timezone.utc)
