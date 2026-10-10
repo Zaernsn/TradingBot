@@ -45,3 +45,24 @@ def test_rolling_loss_halt_does_not_disable_existing_exits():
     result=engine({'BTC/EUR':data},risk=risk(daily_loss_pct=.001)).run(warmup=2)
     assert result['risk_halted']
     assert any(t['side']=='SELL' for t in result['trades'])
+
+
+def test_suite_registers_all_variants_before_first_result(tmp_path,monkeypatch):
+    import json
+    from app.cli import exit_suite
+    source=tmp_path/'input.json'
+    source.write_text(json.dumps({'risk':{'risk_per_trade_pct':.01}}))
+    registered=[]
+    def register(manifest, protocol, output):
+        registered.append(json.loads(protocol.read_text())['exit_experiment']['variant'])
+    def run(directory,candidate):
+        assert registered==['fixed','atr','trailing','time','no-progress']
+        path=directory/'fixture-result.json'
+        path.write_text(json.dumps({'result':{'total_return_pct':-.01,'max_drawdown_pct':-.02,
+            'closed_trades':2,'expectancy':-.5,'total_fees':1},'cost_stress':{'total_return_pct':-.02}}))
+        return path
+    monkeypatch.setattr(exit_suite,'register',register)
+    monkeypatch.setattr(exit_suite,'run_experiment',run)
+    result=exit_suite.run_suite('fixture',source,tmp_path/'suite')
+    report=json.loads(result.read_text())
+    assert len(report['results'])==5 and not report['holdout_consumed']

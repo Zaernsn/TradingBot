@@ -69,6 +69,22 @@ def test_missing_terminal_data_is_not_a_fabricated_fill():
     assert not any(t['side']=='SELL' and t['symbol']=='ETH/EUR' for t in result['trades'])
 
 
+def test_explicit_no_trade_gaps_do_not_fabricate_fills_or_cross_gap_signals():
+    data=rows(12)
+    sparse=data[:3]+data[6:]
+    with pytest.raises(ValueError,match='contiguous'):
+        engine({'BTC/EUR':sparse},risk=risk()).run(warmup=2)
+    sparse[3]=OHLCV(sparse[3].timestamp,80,80,80,80,10000)
+    result=engine({'BTC/EUR':sparse},risk=risk(),allow_no_trade_gaps=True).run(warmup=2)
+    assert result['trades'][1]['side']=='SELL'
+    assert result['trades'][1]['timestamp']==data[6].timestamp
+    assert result['trades'][1]['price']==80
+    assert not any(data[3].timestamp<=t['timestamp']<data[6].timestamp for t in result['trades'])
+    later_buys=[t for t in result['trades'] if t['side']=='BUY' and t['timestamp']>data[2].timestamp]
+    assert all(t['timestamp']>=data[8].timestamp for t in later_buys)
+    assert len(result['equity_curve'])==10
+
+
 def test_reproducible_ids_duplicate_rejection_and_costs():
     data={'BTC/EUR':rows()}
     a=engine(data,risk=risk()).run(warmup=10)

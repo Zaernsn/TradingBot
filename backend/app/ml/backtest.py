@@ -24,7 +24,8 @@ class PortfolioBacktestEngine:
                  daily_by_symbol=None, max_open_positions=5, model_factory=None, select_assets=True,
                  start_date=None, end_date=None, risk=None, intrabar_stops=True,
                  participation_rate=.01, minimum_order_eur=0., strategy_id='signal-v2',
-                 liquidate_end=True, exit_experiment=None):
+                 liquidate_end=True, exit_experiment=None, allow_no_trade_gaps=False):
+        self.allow_no_trade_gaps=bool(allow_no_trade_gaps)
         from app.ml.exit_experiments import ExitExperiment
         self.exit_experiment=ExitExperiment(**(exit_experiment or {}))
         self.risk = replace(risk) if risk is not None else RiskManager(
@@ -44,7 +45,7 @@ class PortfolioBacktestEngine:
         for candles in self.data.values():
             if any(c.timestamp.minute or c.timestamp.second or c.timestamp.microsecond for c in candles):
                 raise ValueError('Research candles must align to UTC hours')
-            if any(b.timestamp-a.timestamp!=timedelta(hours=1) for a,b in zip(candles,candles[1:])):
+            if not self.allow_no_trade_gaps and any(b.timestamp-a.timestamp!=timedelta(hours=1) for a,b in zip(candles,candles[1:])):
                 raise ValueError('Backtest requires contiguous hourly data; repair missing candles')
         self.initial_cash=initial_cash
         self.fee_pct=fee_pct
@@ -92,8 +93,21 @@ class PortfolioBacktestEngine:
         common=set.union(*(set(c.timestamp for c in rows) for rows in self.data.values())) if self.data else set()
         timeline=sorted(t for t in common if (not self.start_date or t>=self.start_date) and (not self.end_date or t<self.end_date))
         index={s:{c.timestamp:i for i,c in enumerate(rows)} for s,rows in self.data.items()}
+        segment_start={}
+        for symbol,rows in self.data.items():
+            starts=[]; start=0
+            for i,row in enumerate(rows):
+                if i and row.timestamp-rows[i-1].timestamp!=timedelta(hours=1):
+                    start=i
+                starts.append(start)
+            segment_start[symbol]=starts
         timeline=[t for t in timeline if any(index[s].get(t,-1)>=warmup for s in self.data)]
-        if any(b-a != timedelta(hours=1) for a,b in zip(timeline,timeline[1:])):
+        if self.allow_no_trade_gaps and timeline:
+            beginning,ending=timeline[0],timeline[-1]
+            timeline=[beginning+timedelta(hours=i) for i in range(int((ending-beginning).total_seconds()/3600)+1)]
+            if any(segment_start[s] and max(segment_start[s])>0 for s in self.data):
+                self.limitations.add('No-trade gaps preserved: signals restart warmup; missing quotes cannot execute exits and held marks may be stale')
+        elif any(b-a != timedelta(hours=1) for a,b in zip(timeline,timeline[1:])):
             raise ValueError('Portfolio timeline contains missing hours')
         models={s:self.model_factory(s) for s in self.data}
         watchlist=[]; first_prices={}; last_prices={}; daily_counts=defaultdict(int)
@@ -101,7 +115,7 @@ class PortfolioBacktestEngine:
         first_stamps={}; last_stamps={}
         for step,stamp in enumerate(timeline):
             current={s:rows[index[s][stamp]] for s,rows in self.data.items() if stamp in index[s]}
-            past={s:self.data[s][max(0,index[s][stamp]-8760):index[s][stamp]] for s in current}
+            past={s:self.data[s][max(segment_start[s][index[s][stamp]],index[s][stamp]-8760):index[s][stamp]] for s in current}
             eligible={s for s in current if len(past[s])>=warmup}
             for s in eligible:
                 first_prices.setdefault(s,current[s].open); first_stamps.setdefault(s,stamp)
@@ -207,7 +221,8 @@ class PortfolioBacktestEngine:
         config={'risk':asdict(risk),'warmup':warmup,'retrain_every':retrain_every,'strategy_id':self.strategy_id,
                 'select_assets':self.select_assets,'start':self.start_date,'end':self.end_date,'initial_cash':self.initial_cash,
                 'intrabar_stops':self.intrabar_stops,'participation_rate':self.participation_rate,'minimum_order_eur':self.minimum_order_eur,
-                'liquidate_end':self.liquidate_end,'exit_experiment':asdict(self.exit_experiment)}
+                'liquidate_end':self.liquidate_end,'exit_experiment':asdict(self.exit_experiment),
+                'allow_no_trade_gaps':self.allow_no_trade_gaps}
         data_hash=digest({'hourly':{s:[vars(c) for c in rows] for s,rows in self.data.items()},
                           'daily':{s:[vars(c) for c in rows] for s,rows in self.daily.items()}})
         result.update(experiment={'configuration':config,'data_sha256':data_hash,'run_id':digest({'config':config,'data':data_hash})},

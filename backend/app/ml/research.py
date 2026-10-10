@@ -31,7 +31,7 @@ def write_json(path, value):
         json.dump(value, stream, indent=2, sort_keys=True, default=str, allow_nan=False)
 
 
-def load_dataset(manifest_path):
+def load_dataset(manifest_path, allow_no_trade_gaps=False):
     manifest_path = Path(manifest_path).resolve()
     manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
     data, provenance = {}, {}
@@ -49,19 +49,20 @@ def load_dataset(manifest_path):
         clean = completed_candles(rows)
         if not clean or len(clean) != len(rows) or [c.timestamp for c in clean] != [c.timestamp for c in rows]:
             raise ValueError(f'{symbol}: empty, unordered, duplicate or unfinished candles')
-        if any(b.timestamp-a.timestamp != INTERVALS['1h'] for a,b in zip(clean,clean[1:])):
+        gaps=sum(b.timestamp-a.timestamp != INTERVALS['1h'] for a,b in zip(clean,clean[1:]))
+        if gaps and not allow_no_trade_gaps:
             raise ValueError(f'{symbol}: history has missing hours')
         if any(c.timestamp.minute or c.timestamp.second or c.timestamp.microsecond for c in clean):
             raise ValueError(f'{symbol}: timestamps must align to UTC hours')
         data[symbol] = clean
-        provenance[symbol] = {**asset, 'rows': len(clean), 'first': clean[0].timestamp, 'last': clean[-1].timestamp}
+        provenance[symbol] = {**asset, 'rows': len(clean), 'first': clean[0].timestamp, 'last': clean[-1].timestamp,'gaps':gaps}
     if not data: raise ValueError('Manifest has no assets')
     return data, provenance
 
 
 def register(manifest_path, protocol_path, output):
-    data, provenance = load_dataset(manifest_path)
     protocol = json.loads(Path(protocol_path).read_text(encoding='utf-8'))
+    data, provenance = load_dataset(manifest_path,protocol.get('allow_no_trade_gaps',False))
     start, holdout, end = (timestamp(protocol[k]) for k in ('development_start', 'holdout_start', 'end'))
     if not start < holdout < end:
         raise ValueError('Require development_start < holdout_start < end')
@@ -97,7 +98,7 @@ def run_experiment(directory, stage='development', candidate='signal-v2'):
         raise ValueError('Research code changed; register a new protocol and treat prior holdout as consumed')
     if candidate not in protocol.get('candidates', ['signal-v2','momentum','payoff']):
         raise ValueError('Candidate was not preregistered')
-    data, provenance = load_dataset(registered['manifest'])
+    data, provenance = load_dataset(registered['manifest'],protocol.get('allow_no_trade_gaps',False))
     if digest(provenance) != digest(registered['provenance']):
         raise ValueError('Dataset changed after registration')
     risk = RiskManager(**protocol['risk'])
@@ -125,6 +126,7 @@ def run_experiment(directory, stage='development', candidate='signal-v2'):
             model_factory=factories[strategy], strategy_id=strategy,
             minimum_order_eur=protocol.get('minimum_order_eur',0.),
             participation_rate=protocol.get('participation_rate',.01),
+            allow_no_trade_gaps=protocol.get('allow_no_trade_gaps',False),
             exit_experiment=protocol.get('exit_experiment')).run(warmup=protocol.get('warmup',720))
     base = evaluate(candidate)
     stress = evaluate(candidate,2.)

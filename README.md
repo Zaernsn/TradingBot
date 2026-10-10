@@ -1,5 +1,7 @@
 # AI trading platform
 
+10 October update: see the [release and deployment record](docs/RELEASE_2026_10_10.md) and [historical baseline results](docs/RESEARCH_BASELINE_2026_10_10.md). Monitoring and optional entry guards are deployed locally; the historical candidates did not pass the development gate. Experimental exits and 15-minute strategies are not enabled live.
+
 ## Fast meme momentum
 
 Settings now includes a **Fast meme €80 preset**: hourly three-hour momentum, six-hour closing-price breakout and volume confirmation, opening memecoin positions only. It ranks entries by volatility-adjusted strength, limits orders to 0.1% of daily pair turnover and 5% of available buy/sell depth, and waits one hour after a sale before re-entry. The preset retains two positions of up to €20, 25% per-coin and 50% aggregate limits, tightens spread to 0.3% and turnover to €100,000, and adds a 24-hour holding limit. These are ceilings, not guaranteed order sizes.

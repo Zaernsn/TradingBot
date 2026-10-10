@@ -9,6 +9,7 @@
   "minimum_order_eur": 5,
   "participation_rate": 0.001,
   "historical_universe_evidence": false,
+  "allow_no_trade_gaps": true,
   "adaptive_parameters": {
     "trend_breadth": 0.6,
     "trend_return": 0.0025,
@@ -41,7 +42,7 @@
   "notes": [
     "Offline hypothesis only; not saved to any live account.",
     "Predeclared pairs: BTC/EUR, ETH/EUR, SOL/EUR, DOGE/EUR, SHIB/EUR, PEPE/EUR.",
-    "Each input must pass contiguous-hour validation; missing data will not be filled.",
+    "Missing no-trade intervals remain missing. Signals restart warmup after a gap; no fills are possible without an actual candle. Stale marks are reported.",
     "Current default automatic controller parameters, not a claim of matching a user's promoted controller.",
     "Current base-tier fee stress assumption, not historical fee-tier reconstruction.",
     "No holdout use or challenger activation without a frozen candidate and separate review."
