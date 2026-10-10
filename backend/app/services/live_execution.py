@@ -13,6 +13,7 @@ from app.exchanges.base import OrderSide
 from app.models.portfolio import ExecutionOrder, Position, BotState
 from app.services.exchange_service import decrypt_value
 from app.services.trading_service import record_fill
+from app.services.execution_evidence import now_iso
 
 TERMINAL = {'FILLED','CANCELED','REJECTED'}
 
@@ -91,6 +92,12 @@ async def reconcile_order(db,portfolio,exchange,order):
     order.filled_base_fee=result.base_fee
     order.status=result.status.value
     order.last_error=None
+    evidence=dict(order.execution_evidence or {})
+    if result.filled_qty > 0:
+        evidence.setdefault('first_fill_observed_at', now_iso())
+    if order.status in TERMINAL:
+        evidence.setdefault('terminal_observed_at', now_iso())
+    order.execution_evidence=evidence
     db.commit()  # Ledger progress and book accounting commit together.
     return order.status in TERMINAL
 
@@ -136,7 +143,9 @@ async def verify_balances(db,portfolio,exchange, *, sync_cash=False):
     return balances
 
 
-async def execute_live(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token=None,intent_key=None):
+async def execute_live(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token=None,intent_key=None,execution_context=None):
+    evidence=dict(execution_context or {})
+    evidence.setdefault('decision_at', now_iso())
     assert_live_enabled(db,portfolio,user,token)
     if unresolved(db,portfolio): raise ValueError('Reconcile pending orders before submitting another')
     # Price-protected IOC orders never rest on the order book indefinitely.
@@ -153,7 +162,9 @@ async def execute_live(db,portfolio,user,exchange,symbol,side,quantity,price,ris
         raise OrderIntentAlreadyHandled(
             f'Order intent already recorded with status {existing.status}; duplicate submission blocked')
     order=ExecutionOrder(portfolio_id=portfolio.id,client_id=client_id,symbol=symbol,
-                         side=side.value,requested_quantity=quantity,status='SUBMITTING')
+                         side=side.value,requested_quantity=quantity,status='SUBMITTING',
+                         execution_evidence={**evidence,'expected_price':price,'price_limit':limit,
+                                             'expected_fee_eur':quantity*price*risk.fee_pct})
     db.add(order); db.commit(); db.refresh(order)
     # No automatic retries: a timeout may still mean Kraken accepted the order.
     try:
@@ -178,9 +189,26 @@ async def execute_live(db,portfolio,user,exchange,symbol,side,quantity,price,ris
             if quantity*limit*(1+current.fee_pct)>memecoin_budget(portfolio,current,symbol,positions)+1e-7:
                 order.status='REJECTED'; order.last_error='Memecoin exposure control changed before submission'; db.commit()
                 raise ValueError(order.last_error)
+        order.execution_evidence={**order.execution_evidence,'submission_started_at':now_iso()}
+        db.commit()  # Persist before sending; a crash must not erase the submission boundary.
+        try:
+            assert_live_enabled(db,portfolio,user,token)
+            if side==OrderSide.BUY:
+                from app.services.entry_guards import evaluate
+                from app.services.risk_service import get_risk_config
+                db.refresh(portfolio)
+                current=get_risk_config(db,user.id); db.refresh(current)
+                guard=evaluate(db,portfolio,current)
+                db.commit()
+                if guard.get('halted'):
+                    raise ValueError('Entry guard halted new buys')
+        except Exception:
+            order.status='REJECTED'; order.last_error='Stopped or entry guard halted before submission'; db.commit()
+            raise
         result=await exchange.submit_ioc(symbol,side,quantity,limit,order.client_id)
         order.exchange_id=result.order_id
         order.status='PENDING'
+        order.execution_evidence={**order.execution_evidence,'acknowledged_at':now_iso()}
         db.commit()
         await reconcile_order(db,portfolio,exchange,order)
     except Exception as exc:

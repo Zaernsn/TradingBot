@@ -20,7 +20,7 @@ def migrate():
         if tables and not versioned:
             legacy={'users','portfolios','positions','trades','signals','bot_states','risk_configs'}
             extras=tables-legacy
-            if not legacy.issubset(tables) or extras-{'execution_orders','market_candles','password_reset_tokens','auth_rate_limits','kraken_snapshots','research_snapshots','model_recoveries','strategy_candidates','shadow_runs','shadow_trades','shadow_equity'}:
+            if not legacy.issubset(tables) or extras-{'execution_orders','market_candles','password_reset_tokens','auth_rate_limits','kraken_snapshots','research_snapshots','model_recoveries','strategy_candidates','shadow_runs','shadow_trades','shadow_equity','equity_checkpoints'}:
                 raise RuntimeError('Unversioned database has an unknown layout; back up and reconcile its migration baseline')
             with engine.connect() as connection:
                 for name in extras:
@@ -35,6 +35,8 @@ def migrate():
             }
             observed={t:{c['name'] for c in inspector.get_columns(t)} for t in legacy}
             later['risk_configs'].update({'risk_per_trade_pct','max_holding_hours','discovery_limit','watchlist_limit','entry_strategy','buy_probability_threshold'})
+            later['risk_configs'].update({'daily_loss_pct','weekly_loss_pct','max_realized_slippage_pct','max_order_failures'})
+            later['portfolios'].add('entry_halt')
             later['bot_states'].update({'entry_decisions','candidate_status','discovery_stats','protection_status'})
             expected={t:set(Base.metadata.tables[t].columns.keys())-later.get(t,set()) for t in legacy}
             revision='9e9b4ef6f510'

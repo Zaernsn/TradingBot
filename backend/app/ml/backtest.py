@@ -24,7 +24,9 @@ class PortfolioBacktestEngine:
                  daily_by_symbol=None, max_open_positions=5, model_factory=None, select_assets=True,
                  start_date=None, end_date=None, risk=None, intrabar_stops=True,
                  participation_rate=.01, minimum_order_eur=0., strategy_id='signal-v2',
-                 liquidate_end=True):
+                 liquidate_end=True, exit_experiment=None):
+        from app.ml.exit_experiments import ExitExperiment
+        self.exit_experiment=ExitExperiment(**(exit_experiment or {}))
         self.risk = replace(risk) if risk is not None else RiskManager(
             .2,.03,.06,fee_pct,10,None,12,max_open_positions,slippage_pct=slippage_pct,
             memecoins_enabled=any(s in MEMECOIN_PAIRS for s in candles_by_symbol))
@@ -85,6 +87,8 @@ class PortfolioBacktestEngine:
         self.fees=0.; self.turnover=0.; self.exposures=[]
         self.limitations=set(); self.curve_timestamps=[]
         self.last_exits={}
+        if self.risk.max_realized_slippage_pct or self.risk.max_order_failures:
+            self.limitations.add('Live execution-quality halts cannot be reproduced from candles alone')
         common=set.union(*(set(c.timestamp for c in rows) for rows in self.data.values())) if self.data else set()
         timeline=sorted(t for t in common if (not self.start_date or t>=self.start_date) and (not self.end_date or t<self.end_date))
         index={s:{c.timestamp:i for i,c in enumerate(rows)} for s,rows in self.data.items()}
@@ -126,12 +130,20 @@ class PortfolioBacktestEngine:
                 bar=current[symbol]
                 # Only the execution-time open is known; do not use this bar's future high/low.
                 price=bar.open if exit_reason(position,risk,bar.open,now=stamp) or predictions.get(symbol,{}).get('action')=='SELL' else None
+                if self.exit_experiment.variant!='fixed':
+                    # Replace the fixed stop only; keep the baseline target/model exits.
+                    position_risk=replace(risk,stop_loss_pct=position.experiment_stop_pct)
+                    price=bar.open if (exit_reason(position,position_risk,bar.open,now=stamp)
+                        or bar.open<=self.exit_experiment.stop_price(position,risk.stop_loss_pct)
+                        or self.exit_experiment.time_exit(position,bar.open,stamp)
+                        or predictions.get(symbol,{}).get('action')=='SELL') else None
                 if price is not None:
                     self._sell(symbol,price,stamp); exited.add(symbol)
             # Drawdown is assessed using information known at the execution time.
             equity=self.cash+sum(p.quantity*p.current_price for p in self.positions.values())
             self.peak=max(self.peak,equity)
             if 1-equity/self.peak>=risk.max_drawdown_pct: self.halted=True
+            self._rolling_loss_halt(equity)
             for symbol in rank_entries(watchlist,predictions):
                 if self.halted or symbol in exited or symbol in self.positions or predictions.get(symbol,{}).get('action')!='BUY': continue
                 active_strategy=predictions.get(symbol,{}).get('active_strategy',risk.entry_strategy)
@@ -145,7 +157,9 @@ class PortfolioBacktestEngine:
                     turnover=sum(c.volume*c.close for c in past[symbol][-24:])
                     if turnover<risk.memecoin_min_daily_volume_eur: continue
                 portfolio=SimpleNamespace(equity=self.cash+sum(p.quantity*p.current_price for p in self.positions.values()),cash=self.cash)
-                budget=entry_budget(portfolio,risk,symbol,list(self.positions.values()),past)
+                stop_pct=self.exit_experiment.initial_stop_pct(past[symbol],current[symbol].open,risk.stop_loss_pct)
+                sizing_risk=replace(risk,stop_loss_pct=stop_pct)
+                budget=entry_budget(portfolio,sizing_risk,symbol,list(self.positions.values()),past)
                 if active_strategy == 'fast_momentum':
                     budget=min(budget,turnover*.001)
                 price=current[symbol].open*(1+self.slippage_pct)
@@ -154,20 +168,24 @@ class PortfolioBacktestEngine:
                 fee=quantity*price*self.fee_pct
                 self.cash-=quantity*price+fee
                 self.positions[symbol]=SimpleNamespace(symbol=symbol,quantity=quantity,avg_entry_price=price,
-                                                       entry_fees=fee,current_price=current[symbol].open,opened_at=stamp)
+                                                       entry_fees=fee,current_price=current[symbol].open,opened_at=stamp,
+                                                       experiment_stop_pct=stop_pct,high_water_price=price)
                 self._trade(symbol,'BUY',quantity,price,fee,None,stamp)
                 daily_counts[stamp.date()]+=1
             if self.intrabar_stops:
                 for symbol,position in list(self.positions.items()):
                     if symbol not in current: continue
                     bar=current[symbol]
-                    stop=position.avg_entry_price*(1-risk.stop_loss_pct)
+                    stop=self.exit_experiment.stop_price(position,risk.stop_loss_pct)
                     target=position.avg_entry_price*(1+risk.take_profit_pct)
                     # Conservative stop-first ordering when both barriers are touched.
                     if bar.low<=stop: self._sell(symbol,min(bar.open,stop),stamp+timedelta(hours=1))
                     elif bar.high>=target: self._sell(symbol,target,stamp+timedelta(hours=1))
             for s,p in self.positions.items():
-                if s in current: p.current_price=current[s].close
+                if s in current:
+                    p.current_price=current[s].close
+                    # This high becomes available only after this candle's exit checks.
+                    p.high_water_price=max(p.high_water_price,current[s].high)
             equity=self.cash+sum(p.quantity*p.current_price for p in self.positions.values())
             self.peak=max(self.peak,equity)
             if 1-equity/self.peak>=risk.max_drawdown_pct: self.halted=True
@@ -175,6 +193,7 @@ class PortfolioBacktestEngine:
             self.cash_curve.append(self.cash)
             self.curve_timestamps.append(stamp+timedelta(hours=1))
             self.exposures.append((equity-self.cash)/equity if equity>0 else 0.)
+            self._rolling_loss_halt(equity)
         if timeline and self.liquidate_end:
             for symbol in list(self.positions):
                 if last_stamps.get(symbol)!=timeline[-1]:
@@ -188,7 +207,7 @@ class PortfolioBacktestEngine:
         config={'risk':asdict(risk),'warmup':warmup,'retrain_every':retrain_every,'strategy_id':self.strategy_id,
                 'select_assets':self.select_assets,'start':self.start_date,'end':self.end_date,'initial_cash':self.initial_cash,
                 'intrabar_stops':self.intrabar_stops,'participation_rate':self.participation_rate,'minimum_order_eur':self.minimum_order_eur,
-                'liquidate_end':self.liquidate_end}
+                'liquidate_end':self.liquidate_end,'exit_experiment':asdict(self.exit_experiment)}
         data_hash=digest({'hourly':{s:[vars(c) for c in rows] for s,rows in self.data.items()},
                           'daily':{s:[vars(c) for c in rows] for s,rows in self.daily.items()}})
         result.update(experiment={'configuration':config,'data_sha256':data_hash,'run_id':digest({'config':config,'data':data_hash})},
@@ -198,6 +217,7 @@ class PortfolioBacktestEngine:
                       ending_cash=self.cash,
                       open_positions={symbol:{'quantity':position.quantity,'avg_entry_price':position.avg_entry_price,
                           'entry_fees':position.entry_fees,'current_price':position.current_price,
+                          'high_water_price':position.high_water_price,'experiment_stop_pct':position.experiment_stop_pct,
                           'opened_at':position.opened_at}
                           for symbol,position in self.positions.items()},
                       **curve_metrics(self.curve))
@@ -206,6 +226,14 @@ class PortfolioBacktestEngine:
     def _trade(self,symbol,side,quantity,price,fee,pnl,stamp):
         self.fees+=fee; self.turnover+=quantity*price
         self.trades.append(dict(symbol=symbol,timestamp=stamp,side=side,quantity=quantity,price=price,fee=fee,pnl=pnl))
+
+    def _rolling_loss_halt(self, equity):
+        # Replay uses hourly checkpoints; there are no funding flows in a run.
+        for hours, limit in ((24,self.risk.daily_loss_pct),(168,self.risk.weekly_loss_pct)):
+            if limit:
+                baseline=self.curve[max(0,len(self.curve)-1-hours)]
+                if baseline>0 and 1-equity/baseline>=limit:
+                    self.halted=True
 
     def _sell(self,symbol,market,stamp):
         self.last_exits[symbol]=stamp
@@ -225,6 +253,7 @@ class PortfolioBacktestEngine:
         per_month=defaultdict(float)
         for trade in sells: per_month[trade['timestamp'].strftime('%Y-%m')]+=trade['pnl']
         profits=sorted([t['pnl'] for t in sells if t['pnl']>0],reverse=True)
+        losses=-sum(t['pnl'] for t in sells if t['pnl']<0)
         factors={s:(last[s]*(1-self.slippage_pct)*(1-self.fee_pct))/(first[s]*(1+self.slippage_pct)*(1+self.fee_pct))-1 for s in first}
         return dict(symbol=','.join(self.data),initial_cash=self.initial_cash,final_equity=float(values[-1]),
             total_return_pct=float(values[-1]/self.initial_cash-1),num_trades=len(self.trades),
@@ -232,6 +261,7 @@ class PortfolioBacktestEngine:
             max_drawdown_pct=float(drawdown.min()),
             sharpe_ratio=float(returns.mean()/returns.std(ddof=1)*math.sqrt(365*24)) if len(returns)>1 and returns.std(ddof=1)>1e-12 else 0.,
             expectancy=float(np.mean([t['pnl'] for t in sells])) if sells else 0.,
+            profit_factor=sum(profits)/losses if losses else None,
             total_fees=self.fees,turnover=self.turnover/self.initial_cash,
             average_exposure=float(np.mean(self.exposures)) if self.exposures else 0.,
             per_month_pnl=dict(per_month),top_five_profit_share=sum(profits[:5])/sum(profits) if profits else 0.,

@@ -33,8 +33,17 @@ class RiskManager:
     watchlist_limit: int = 30
     entry_strategy: str = 'model'
     buy_probability_threshold: float = .4
+    daily_loss_pct: float = 0.
+    weekly_loss_pct: float = 0.
+    max_realized_slippage_pct: float = 0.
+    max_order_failures: int = 0
 
     def __post_init__(self):
+        import math
+        if any(not math.isfinite(v) or not 0<=v<=1 for v in (self.daily_loss_pct,self.weekly_loss_pct)):
+            raise ValueError('Invalid rolling loss threshold')
+        if not math.isfinite(self.max_realized_slippage_pct) or not 0<=self.max_realized_slippage_pct<=.1 or not 0<=self.max_order_failures<=20:
+            raise ValueError('Invalid execution quality threshold')
         if self.entry_strategy not in {'model', 'momentum', 'fast_momentum', 'auto'}:
             raise ValueError('Unknown entry strategy')
         if not .4 <= self.buy_probability_threshold <= .95:
@@ -103,6 +112,10 @@ def risk_manager_from_config(config: RiskConfig) -> RiskManager:
         watchlist_limit=config.watchlist_limit,
         entry_strategy=config.entry_strategy,
         buy_probability_threshold=config.buy_probability_threshold,
+        daily_loss_pct=config.daily_loss_pct,
+        weekly_loss_pct=config.weekly_loss_pct,
+        max_realized_slippage_pct=config.max_realized_slippage_pct,
+        max_order_failures=config.max_order_failures,
         max_open_positions=config.max_open_positions,
         max_drawdown_pct=config.max_drawdown_pct,
         max_total_exposure_pct=config.max_total_exposure_pct,

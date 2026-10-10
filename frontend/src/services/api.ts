@@ -70,6 +70,7 @@ export const botApi = {
 
 export const settingsApi = {
   resumeRisk: () => api.post('/settings/resume-risk?confirm=true'),
+  resumeEntryGuards: () => api.post('/settings/resume-entry-guards?confirm=true'),
   getRisk: () => api.get('/settings/risk'),
   updateRisk: (data: Partial<{
     entry_strategy: 'model' | 'momentum' | 'fast_momentum' | 'auto';
@@ -88,6 +89,10 @@ export const settingsApi = {
     allocation_mode: "equal";
     prediction_horizon: number;
     max_drawdown_pct: number;
+    daily_loss_pct: number;
+    weekly_loss_pct: number;
+    max_realized_slippage_pct: number;
+    max_order_failures: number;
     max_total_exposure_pct: number;
     max_correlated_exposure_pct: number;
     correlation_threshold: number;

@@ -73,6 +73,7 @@ export interface EntryDecision {
 }
 
 export interface BotState {
+  entry_halt?: { halted?: boolean; reasons?: string[]; started_at?: string; recovery?: string } | null;
   market_data_status?: { connected: boolean; subscriptions: number; reconnects: number; rest_requests: number } | null;
   protection_status?: {
     status: string;
@@ -126,6 +127,10 @@ export interface ResearchStatus {
 }
 
 export interface RiskConfig {
+  daily_loss_pct: number;
+  weekly_loss_pct: number;
+  max_realized_slippage_pct: number;
+  max_order_failures: number;
   entry_strategy: 'model' | 'momentum' | 'fast_momentum' | 'auto';
   buy_probability_threshold: number;
   discovery_limit: number;

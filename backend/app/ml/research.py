@@ -10,12 +10,12 @@ from app.exchanges.base import OHLCV
 from app.ml.backtest import PortfolioBacktestEngine
 from app.ml.evaluation import digest
 from app.ml.models import SignalModel
-from app.ml.strategies import MomentumModel, PayoffModel, WindowedSignalModel, FastMomentumModel
+from app.ml.strategies import MomentumModel, PayoffModel, WindowedSignalModel, FastMomentumModel, AdaptiveMomentumModel, AdaptiveParameters
 from app.services.market_data import completed_candles, INTERVALS
 from app.services.research_service import candidate_identity, code_identity
 from app.services.risk_service import RiskManager
 
-RESEARCH_CANDIDATES={'signal-v2','momentum','fast-momentum','payoff','normalized-3m','normalized-6m','normalized-12m'}
+RESEARCH_CANDIDATES={'auto','signal-v2','momentum','fast-momentum','payoff','normalized-3m','normalized-6m','normalized-12m'}
 
 
 def timestamp(value):
@@ -66,6 +66,11 @@ def register(manifest_path, protocol_path, output):
     if not start < holdout < end:
         raise ValueError('Require development_start < holdout_start < end')
     risk = RiskManager(**protocol['risk'])
+    from app.ml.exit_experiments import ExitExperiment
+    exit_policy=ExitExperiment(**protocol.get('exit_experiment',{}))
+    if exit_policy.variant!='fixed' and risk.risk_per_trade_pct<=0:
+        raise ValueError('Exit experiments require an explicit matched per-trade risk budget')
+    AdaptiveParameters(**protocol.get('adaptive_parameters',{}))
     if risk.fee_pct < 0 or risk.fee_pct >= .5 or risk.slippage_pct < 0 or risk.slippage_pct >= .5:
         raise ValueError('Invalid costs for 2x stress evaluation')
     if not any(rows[0].timestamp < start and rows[-1].timestamp >= end-INTERVALS['1h'] for rows in data.values()):
@@ -97,6 +102,7 @@ def run_experiment(directory, stage='development', candidate='signal-v2'):
         raise ValueError('Dataset changed after registration')
     risk = RiskManager(**protocol['risk'])
     factories = {'signal-v2': lambda _: SignalModel(persist=False), 'momentum': lambda _: MomentumModel(),
+                 'auto': lambda _: AdaptiveMomentumModel(parameters=AdaptiveParameters(**protocol.get('adaptive_parameters',{}))),
                  'fast-momentum': lambda _: FastMomentumModel(),
                  'payoff': lambda _: PayoffModel(),
                  'normalized-3m':lambda _:WindowedSignalModel(90*24),
@@ -112,12 +118,14 @@ def run_experiment(directory, stage='development', candidate='signal-v2'):
     # Development never passes holdout candles to the engine or its data fingerprint.
     data = {s:[c for c in rows if c.timestamp < end] for s,rows in data.items()}
     def evaluate(strategy, costs=1.):
-        configured = replace(risk, fee_pct=risk.fee_pct*costs, slippage_pct=risk.slippage_pct*costs)
+        configured = replace(risk, fee_pct=risk.fee_pct*costs, slippage_pct=risk.slippage_pct*costs,
+                             entry_strategy={'auto':'auto','momentum':'momentum','fast-momentum':'fast_momentum'}.get(strategy,'model'))
         return PortfolioBacktestEngine(data, risk=configured, start_date=start, end_date=end,
             initial_cash=protocol.get('initial_cash',500.), select_assets=protocol.get('select_assets',True),
             model_factory=factories[strategy], strategy_id=strategy,
             minimum_order_eur=protocol.get('minimum_order_eur',0.),
-            participation_rate=protocol.get('participation_rate',.01)).run(warmup=protocol.get('warmup',720))
+            participation_rate=protocol.get('participation_rate',.01),
+            exit_experiment=protocol.get('exit_experiment')).run(warmup=protocol.get('warmup',720))
     base = evaluate(candidate)
     stress = evaluate(candidate,2.)
     simple = evaluate('momentum')

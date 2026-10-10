@@ -49,11 +49,12 @@ def test_upgrade_legacy_startup_with_new_empty_tables(tmp_path,monkeypatch):
     Base.metadata.create_all(engine)
     with engine.begin() as conn:
         conn.execute(text('ALTER TABLE execution_orders DROP COLUMN filled_base_fee'))
+        conn.execute(text('ALTER TABLE execution_orders DROP COLUMN execution_evidence'))
     assert 'lock_token' not in {c['name'] for c in inspect(engine).get_columns('bot_states')}
     migrate()
     assert 'lock_token' in {c['name'] for c in inspect(engine).get_columns('bot_states')}
     with engine.connect() as conn:
         assert conn.execute(text('SELECT email FROM users WHERE id=1')).scalar()=='preserved@example.com'
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar()=='n61010protection'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar()=='p61010guards'
     migrate()  # Restart is idempotent.
     engine.dispose()

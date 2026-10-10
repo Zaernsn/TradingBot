@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class PortfolioOut(BaseModel):
+    entry_halt: Optional[dict] = None
     id: int
     currency: str
     cash: float
@@ -66,6 +67,7 @@ class SignalOut(BaseModel):
 
 
 class BotStateOut(BaseModel):
+    entry_halt: Optional[dict] = None
     market_data_status: Optional[dict] = None
     protection_status: Optional[dict] = None
     discovery_stats: Optional[dict] = None
@@ -90,6 +92,10 @@ class BotStateOut(BaseModel):
 
 
 class RiskConfigOut(BaseModel):
+    daily_loss_pct: float = 0.
+    weekly_loss_pct: float = 0.
+    max_realized_slippage_pct: float = 0.
+    max_order_failures: int = 0
     entry_strategy: Literal['model', 'momentum', 'fast_momentum', 'auto'] = 'model'
     buy_probability_threshold: float = .4
     discovery_limit: int = 60
@@ -126,6 +132,10 @@ class RiskConfigOut(BaseModel):
 
 
 class RiskConfigUpdate(BaseModel):
+    daily_loss_pct: Optional[float] = Field(None, ge=0, le=1, allow_inf_nan=False)
+    weekly_loss_pct: Optional[float] = Field(None, ge=0, le=1, allow_inf_nan=False)
+    max_realized_slippage_pct: Optional[float] = Field(None, ge=0, le=.1, allow_inf_nan=False)
+    max_order_failures: Optional[int] = Field(None, ge=0, le=20)
     entry_strategy: Optional[Literal['model', 'momentum', 'fast_momentum', 'auto']] = None
     buy_probability_threshold: Optional[float] = Field(None, ge=.4, le=.95, allow_inf_nan=False)
     discovery_limit: Optional[int] = Field(None, ge=30, le=120)

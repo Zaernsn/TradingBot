@@ -58,4 +58,5 @@ def get_execution_orders(db: Session = Depends(get_db), current_user: User = Dep
     book=get_or_create_portfolio(db,current_user.id)
     rows=db.query(ExecutionOrder).filter(ExecutionOrder.portfolio_id==book.id).order_by(ExecutionOrder.id.desc()).limit(100).all()
     fields=('id','client_id','exchange_id','symbol','side','status','requested_quantity','filled_quantity','filled_fee','last_error','created_at')
-    return [{field:getattr(row,field) for field in fields} for row in rows]
+    from app.services.execution_evidence import report
+    return [{**{field:getattr(row,field) for field in fields}, 'execution_quality':report(row)} for row in rows]

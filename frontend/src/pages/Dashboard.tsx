@@ -279,6 +279,7 @@ export default function Dashboard() {
           <div className="text-muted mt-1" style={{ fontSize: '0.8rem' }}>
             Last run: {botState?.last_run_at ? formatDate(botState.last_run_at) : 'Never'}
           </div>
+          {botState?.entry_halt?.halted && <div className="text-danger">New buys paused: {botState.entry_halt.reasons?.join('; ')}. Protective exits remain enabled while the bot is running. Review in Settings.</div>}
           {botState?.protection_status && (() => {
             const protection = botState.protection_status;
             const checkedAt = protection.last_checked_at ? new Date(protection.last_checked_at).getTime() : 0;

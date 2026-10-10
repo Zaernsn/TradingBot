@@ -224,6 +224,10 @@ export default function Settings() {
         prediction_horizon: risk.prediction_horizon,
 
         max_drawdown_pct: risk.max_drawdown_pct,
+        daily_loss_pct: risk.daily_loss_pct,
+        weekly_loss_pct: risk.weekly_loss_pct,
+        max_realized_slippage_pct: risk.max_realized_slippage_pct,
+        max_order_failures: risk.max_order_failures,
 
         max_total_exposure_pct: risk.max_total_exposure_pct,
 
@@ -510,6 +514,12 @@ export default function Settings() {
                   ['max_position_pct', 'Position limit'], ['stop_loss_pct', 'Stop loss'], ['take_profit_pct', 'Take profit'], ['max_drawdown_pct', 'Max drawdown'], ['max_total_exposure_pct', 'Total exposure'], ['max_correlated_exposure_pct', 'Correlated exposure'],
                 ] as const).map(([key, label]) => <label key={key}>{label} (%)<input type="number" min="0.1" max="100" step="0.1" required value={Number((risk[key] * 100).toFixed(4))} onChange={e => setRisk({...risk, [key]: Number(e.target.value) / 100})} /></label>)}</div>
               </fieldset>
+              <fieldset><legend>Optional entry halts</legend><p className="risk-description">0 = disabled. These halt new buys, not protective sells. Losses are adjusted for verified funding changes, using observed equity every five minutes. History begins when enabled or explicitly reset; it is not a guaranteed loss cap.</p>
+                <div className="risk-fields">
+                  {([['daily_loss_pct','Rolling 24-hour loss',100],['weekly_loss_pct','Rolling seven-day loss',100],['max_realized_slippage_pct','Adverse realized slippage',10]] as const).map(([key,label,max]) => <label key={key}>{label} (%)<input type="number" min="0" max={max} step="0.01" required value={Number(((risk[key] ?? 0)*100).toFixed(4))} onChange={e => setRisk({...risk,[key]:Number(e.target.value)/100})} /></label>)}
+                  <label>Consecutive failed orders (last 24h)<input type="number" min="0" max="20" step="1" required value={risk.max_order_failures ?? 0} onChange={e => setRisk({...risk,max_order_failures:Number(e.target.value)})} /></label>
+                </div>
+              </fieldset>
               <details className="risk-advanced"><summary>Execution & model settings</summary><div className="risk-fields">
                 <label>Model BUY threshold (%)<input type="number" min="40" max="95" step="0.01" value={(risk.buy_probability_threshold ?? .4)*100} onChange={e => setRisk({...risk,buy_probability_threshold:Number(e.target.value)/100})} /><small>Probability strategy only. Lower values permit more entries, including predictions below 50%; model validation and execution checks still apply.</small></label>
                 {([['fee_pct', 'Trading fee', 99], ['slippage_pct', 'Slippage reserve', 5], ['correlation_threshold', 'Correlation threshold', 100]] as const).map(([key, label, max]) => <label key={key}>{label} (%)<input type="number" min="0" max={max} step="0.01" required value={Number((risk[key] * 100).toFixed(4))} onChange={e => setRisk({...risk, [key]: Number(e.target.value) / 100})} /></label>)}
@@ -789,7 +799,18 @@ export default function Settings() {
 
         {orders.length === 0 ? <p>No live order records in this book.</p> : <div style={{overflowX:'auto'}}><table><thead><tr><th>Pair</th><th>Side</th><th>Status</th><th>Filled</th><th>Client ID / exchange ID</th></tr></thead><tbody>
 
-          {orders.map(o => <tr key={o.id}><td>{o.symbol}</td><td>{o.side}</td><td>{o.status}{o.last_error && <div className="text-danger">{o.last_error}</div>}</td><td>{o.filled_quantity}</td><td className="mono">{o.client_id}<br />{o.exchange_id || 'Awaiting confirmation'}</td></tr>)}
+          {orders.map(o => <tr key={o.id}><td>{o.symbol}</td><td>{o.side}</td><td>{o.status}{o.last_error && <div className="text-danger">{o.last_error}</div>}
+            {o.execution_quality && <details><summary>Execution measurements</summary><div className="text-muted">
+              Spread: {o.execution_quality.spread_pct == null ? 'Not recorded' : `${(o.execution_quality.spread_pct * 100).toFixed(3)}%`}<br />
+              Slippage (positive = worse): {o.execution_quality.realized_slippage_pct == null ? 'Not recorded' : `${(o.execution_quality.realized_slippage_pct * 100).toFixed(3)}%`}<br />
+              Decision → submission: {o.execution_quality.decision_to_submit_ms == null ? 'Not recorded' : `${Math.round(o.execution_quality.decision_to_submit_ms)} ms`}<br />
+              Submission → acknowledgement: {o.execution_quality.submit_to_ack_ms == null ? 'Not recorded' : `${Math.round(o.execution_quality.submit_to_ack_ms)} ms`}<br />
+              Quote age at submission: {o.execution_quality.quote_age_at_submit_ms == null ? 'Not recorded' : `${Math.round(o.execution_quality.quote_age_at_submit_ms)} ms`}<br />
+              Fees: €{Number(o.execution_quality.quote_fee_eur || 0).toFixed(4)} + {o.execution_quality.base_fee || 0} {o.execution_quality.base_fee_currency}<br />
+              Remaining: {o.execution_quality.remaining_quantity}<br />
+              Fill times are local observations, not exchange timestamps. Slippage includes market movement and impact.
+            </div></details>}
+          </td><td>{o.filled_quantity}</td><td className="mono">{o.client_id}<br />{o.exchange_id || 'Awaiting confirmation'}</td></tr>)}
 
         </tbody></table></div>}
 
@@ -808,6 +829,11 @@ export default function Settings() {
           try { const res = await settingsApi.resumeRisk(); setMessage(res.data.detail); } catch (err) { setError(errorMessage(err, 'Could not reset drawdown halt')); }
 
         }}>Reset drawdown reference</button>
+        {botState?.entry_halt?.halted && <p className="text-danger">Entry halt: {botState.entry_halt.reasons?.join('; ')}. {botState.entry_halt.recovery}</p>}
+        <button className="btn-warning" disabled={botState?.is_running} onClick={async () => {
+          if (!confirm('Have you reviewed the cause? Reset rolling-loss baselines and entry halts to the current observed equity? The bot stays stopped.')) return;
+          try { const res=await settingsApi.resumeEntryGuards(); setMessage(res.data.detail); setBotState((await botApi.getState()).data); } catch (err) { setError(errorMessage(err,'Could not reset entry guards')); }
+        }}>Reset entry guards after review</button>
 
       </div>
 

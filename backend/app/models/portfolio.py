@@ -18,6 +18,7 @@ class Portfolio(Base):
     initial_equity = Column(Float, default=500.0, server_default="500", nullable=False)
     peak_equity = Column(Float, default=500.0, server_default="500", nullable=False)
     risk_halted = Column(Boolean, default=False, server_default="false", nullable=False)
+    entry_halt = Column(JSON, nullable=True)
     account_fingerprint = Column(String, nullable=True, unique=True)
     target_positions = Column(Integer, default=20, server_default="20", nullable=False)
     __table_args__ = (
@@ -111,6 +112,10 @@ class BotState(Base):
 
 
 class RiskConfig(Base):
+    daily_loss_pct = Column(Float, default=0., server_default='0', nullable=False)
+    weekly_loss_pct = Column(Float, default=0., server_default='0', nullable=False)
+    max_realized_slippage_pct = Column(Float, default=0., server_default='0', nullable=False)
+    max_order_failures = Column(Integer, default=0, server_default='0', nullable=False)
     entry_strategy = Column(String, default='model', server_default='model', nullable=False)
     buy_probability_threshold = Column(Float, default=.4, server_default='0.4', nullable=False)
     __tablename__ = "risk_configs"
@@ -161,6 +166,7 @@ class ExecutionOrder(Base):
     filled_fee = Column(Float, default=0., nullable=False)
     filled_base_fee = Column(Float, default=0., nullable=False)
     last_error = Column(Text, nullable=True)
+    execution_evidence = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -175,6 +181,16 @@ class MarketCandle(Base):
     low = Column(Float, nullable=False)
     close = Column(Float, nullable=False)
     volume = Column(Float, nullable=False)
+
+
+class EquityCheckpoint(Base):
+    __tablename__ = 'equity_checkpoints'
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
+    captured_at = Column(DateTime(timezone=True), nullable=False)
+    equity = Column(Float, nullable=False)
+    funding_basis = Column(Float, nullable=False)
+    __table_args__ = (Index('ix_equity_checkpoint_book_time', 'portfolio_id', 'captured_at'),)
 
 
 class ModelRecovery(Base):

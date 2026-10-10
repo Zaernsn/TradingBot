@@ -188,3 +188,20 @@ def resume_risk(confirm: bool = False, db: Session = Depends(get_db), current_us
     book=get_or_create_portfolio(db,current_user.id)
     book.peak_equity=book.equity; book.risk_halted=False; db.commit()
     return {'detail':'Drawdown reference reset to current equity; bot remains stopped'}
+
+
+@router.post('/resume-entry-guards')
+def resume_entry_guards(confirm: bool = False, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from app.services.trading_books import require_idle
+    from app.services.portfolio_service import get_or_create_portfolio
+    from app.services.entry_guards import resume
+    if not confirm:
+        raise HTTPException(status_code=400, detail='Confirm resetting entry-guard baselines after reviewing the halt')
+    try:
+        require_idle(db,current_user.id)
+        resume(db,get_or_create_portfolio(db,current_user.id))
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409,detail=str(exc))
+    return {'detail':'Entry guards reset to current observed equity; drawdown halt unchanged and bot remains stopped'}

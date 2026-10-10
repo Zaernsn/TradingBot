@@ -110,10 +110,12 @@ async def monitor_open_positions(bot,user_id,token,exited):
                                 check_drawdown(portfolio,risk)
                                 db.commit()
                                 if reason:
+                                    from app.services.execution_evidence import decision_context
                                     triggered+=1
                                     exited.add(symbol)
                                     await bot._execute_locked(db,portfolio,user,exchange,symbol,OrderSide.SELL,
-                                        position.quantity,float(ticker.bid),risk,token,reason)
+                                        position.quantity,float(ticker.bid),risk,token,reason,
+                                        execution_context=decision_context(ticker))
                                 checked+=1
                             except Exception as exc:
                                 db.rollback()
@@ -123,6 +125,13 @@ async def monitor_open_positions(bot,user_id,token,exited):
                     for task in tasks:
                         if not task.done(): task.cancel()
                     await asyncio.gather(*tasks,return_exceptions=True)
+                async with bot._order_locks.setdefault(user_id,asyncio.Lock()):
+                    if bot._running(db,state,portfolio,token):
+                        from app.services.entry_guards import evaluate
+                        config=get_risk_config(db,user_id); db.refresh(config)
+                        recalculate_equity(db,portfolio)
+                        evaluate(db,portfolio,config)
+                        db.commit()
             except Exception as exc:
                 db.rollback()
                 failures['monitor']=(str(exc) if isinstance(exc,ValueError) else type(exc).__name__)[:300]

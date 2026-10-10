@@ -36,6 +36,8 @@ def reset_paper_portfolio(db: Session, user_id: int) -> Portfolio:
     portfolio.initial_equity = settings.DEFAULT_PAPER_BALANCE_EUR
     portfolio.peak_equity = settings.DEFAULT_PAPER_BALANCE_EUR
     portfolio.risk_halted = False
+    from app.services.entry_guards import resume
+    resume(db,portfolio)
     db.commit()
     db.refresh(portfolio)
     return portfolio

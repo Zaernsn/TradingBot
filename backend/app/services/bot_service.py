@@ -264,13 +264,15 @@ class BotOrchestrator:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError): await task
 
-    async def _execution(self,db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key=None):
+    async def _execution(self,db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key=None,execution_context=None):
+        from app.services.execution_evidence import decision_context
+        execution_context=execution_context or decision_context()
         # The monitor and strategy share the lease, but serialize every ledger/order
         # operation inside that ownership. Refresh quantities after acquiring it.
         async with self._order_locks.setdefault(user.id,asyncio.Lock()):
-            return await self._execute_locked(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key)
+            return await self._execute_locked(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key,execution_context)
 
-    async def _execute_locked(self,db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key=None):
+    async def _execute_locked(self,db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,reason,intent_key=None,execution_context=None):
         state=db.query(BotState).filter(BotState.user_id==user.id).first()
         if not self._running(db,state,portfolio,token): return
         if side==OrderSide.SELL:
@@ -279,6 +281,12 @@ class BotOrchestrator:
             if not position: return
             quantity=min(quantity,position.quantity)
         if side==OrderSide.BUY:
+            from app.services.entry_guards import evaluate
+            guard_config=get_risk_config(db,user.id); db.refresh(guard_config)
+            guard=evaluate(db,portfolio,guard_config)
+            db.commit()
+            if guard.get('halted'):
+                raise ValueError('New entries paused: '+ '; '.join(guard['reasons']))
             if symbol in self._cycle_exits.get((user.id,token),set()):
                 raise ValueError('Position exited during this cycle; waiting for a new entry evaluation')
             if portfolio.risk_halted:
@@ -308,7 +316,7 @@ class BotOrchestrator:
         if portfolio.book_type=='LIVE':
             await verify_balances(db,portfolio,exchange)
             return await execute_live(db,portfolio,user,exchange,symbol,side,quantity,price,risk,token,
-                               intent_key=intent_key)
+                               intent_key=intent_key,execution_context=execution_context)
         else:
             return execute_paper_trade(db,portfolio,exchange,symbol,side,quantity,price,risk.fee_pct,
                                 slippage_pct=risk.slippage_pct,reason=reason)
@@ -603,8 +611,9 @@ class BotOrchestrator:
                 if prediction['action']=='SELL' and position:
                     quantity=position.quantity
                     ticker=await exchange.get_ticker(symbol)
+                    from app.services.execution_evidence import decision_context
                     await self._execution(db,portfolio,user,exchange,symbol,OrderSide.SELL,quantity,
-                                          ticker.bid or ticker.last,risk,token,'Model exit')
+                                          ticker.bid or ticker.last,risk,token,'Model exit',execution_context=decision_context(ticker))
             from app.services.entry_readiness import entry_readiness
             for symbol in watchlist:
                 decision=decisions.get(symbol,{})
@@ -702,6 +711,7 @@ class BotOrchestrator:
                         decision['market_note']=(f'Live sizing uses Kraken taker fee {float(taker):.2%}, '
                                                  f'above configured reserve {risk.fee_pct:.2%}.')
                 quantity=budget*(1-1e-10)/(price*(1+execution_risk.slippage_pct)*(1+execution_risk.fee_pct))
+                book=None
                 if live or hasattr(exchange,'market'):
                     # Skip tiny orders that cannot satisfy the exchange minimum before the bot burns a cycle.
                     adapter=exchange if live else exchange.market
@@ -733,9 +743,10 @@ class BotOrchestrator:
                 if check_drawdown(portfolio,risk):
                     db.commit(); explain(symbol,'risk_halt','Drawdown limit reached; new entries are paused.'); continue
                 try:
+                    from app.services.execution_evidence import decision_context
                     await self._execution(db,portfolio,user,exchange,symbol,OrderSide.BUY,quantity,price,execution_risk,token,
                         f'Cost-aware {active_strategy} entry selected by {risk.entry_strategy}',
-                        intent_key=f'signal:{prediction.get("_signal_id")}:BUY')
+                        intent_key=f'signal:{prediction.get("_signal_id")}:BUY',execution_context=decision_context(ticker,book))
                     explain(symbol,'submitted','Entry submitted; check holdings and order status for the confirmed fill.')
                 except Exception as exc:
                     db.rollback(); errors.append(f'{symbol}: {exc}')

@@ -2,6 +2,8 @@
 
 Date prepared: 7 October 2026
 
+Follow-up implementation and deployment evidence: [10 October release record](RELEASE_2026_10_10.md). That record supersedes the original first-release checkpoint below and explicitly separates implemented tools from completed research and pending gates.
+
 ## Implementation checkpoint — 10 October 2026
 
 The first release implements the protection monitor and shared public market-data feed:

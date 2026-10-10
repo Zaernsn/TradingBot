@@ -58,6 +58,8 @@ def get_state(db: Session = Depends(get_db), current_user: User = Depends(get_cu
     ).count()
     if state.entry_decisions is None: state.entry_decisions = {}
     result = BotStateOut.model_validate(state)
+    active=db.query(Portfolio).filter(Portfolio.user_id==current_user.id,Portfolio.is_active.is_(True)).first()
+    result.entry_halt=active.entry_halt if active else None
     from app.services.market_stream import market_stream
     if market_stream is not None:
         result.market_data_status={

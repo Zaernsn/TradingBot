@@ -51,3 +51,5 @@ Thumbs.db
 models/
 backend/models/
 backups/
+research-data/
+research-runs/
