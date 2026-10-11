@@ -1,5 +1,8 @@
 """Automatic bounded strategy research. This module never places orders."""
 from dataclasses import asdict, replace
+import os
+from time import perf_counter
+from app.ml.replay_checkpoint import CheckpointInvalid, restore
 from datetime import datetime, timezone, timedelta
 
 from app.exchanges.base import OHLCV
@@ -23,7 +26,7 @@ from app.ml.evaluation import digest
 
 SUMMARY_FIELDS=('total_return_pct','max_drawdown_pct','num_trades','closed_trades',
                 'win_rate','sharpe_ratio','expectancy','total_fees','turnover',
-                'top_five_profit_share')
+                'top_five_profit_share','cost_attribution')
 MIN_RESEARCH_SYMBOLS=3
 MIN_RESEARCH_CANDLES=720
 RESEARCH_REFRESH_CANDLES=336
@@ -301,6 +304,32 @@ def research_next_candidate(db,user_id,data_snapshot=None,benchmark_cache=None,t
     return row
 
 
+def _shadow_replay(common, settings, checkpoint, mode):
+    """Use the same transition for full and resumed virtual execution."""
+    if mode not in {'full','compare','incremental'}:
+        raise ValueError('SHADOW_REPLAY_MODE must be full, compare, or incremental')
+    started=perf_counter()
+    engine=PortfolioBacktestEngine(**common)
+    result=engine.run(**settings,
+        checkpoint=checkpoint if mode!='full' else None,save_checkpoint=True)
+    if mode=='full' and checkpoint is not None:
+        state=restore(checkpoint,result['replay_checkpoint']['configuration'])
+        prior=state['timeline']
+        current=restore(result['replay_checkpoint'],result['replay_checkpoint']['configuration'])['timeline']
+        if current[:len(prior)]!=prior or engine._checkpoint_prefix(prior[-1] if prior else None)!=checkpoint['prefix']:
+            raise CheckpointInvalid('Processed candle data or timeline changed')
+    telemetry={**result.get('replay_work',{}),'seconds':perf_counter()-started,'mode':mode}
+    if mode=='compare' and checkpoint is not None:
+        started=perf_counter()
+        reference=PortfolioBacktestEngine(**common).run(**settings)
+        comparable=lambda values:{key:value for key,value in values.items()
+            if key not in {'replay_checkpoint','replay_work'}}
+        if digest(comparable(result))!=digest(comparable(reference)):
+            raise CheckpointInvalid('Incremental/full replay parity failed')
+        telemetry.update(parity_verified=True,full_seconds=perf_counter()-started)
+    return result,telemetry
+
+
 def advance_shadow_candidates(db,user_id,now=None,data_snapshot=None,benchmark_cache=None,timeframe_snapshots=None):
     """Advance frozen candidates on candles that arrived after their test time.
 
@@ -355,14 +384,25 @@ def advance_shadow_candidates(db,user_id,now=None,data_snapshot=None,benchmark_c
                     select_assets=False,model_factory=factory,
                     strategy_id=row.candidate_id,start_date=start,end_date=end,
                     liquidate_end=False,timeframe=timeframe,allow_no_trade_gaps=timeframe=='15m')
-        shadow=PortfolioBacktestEngine(**common).run(**run_settings)
+        mode=os.environ.get('SHADOW_REPLAY_MODE','incremental')
+        checkpoints=(run.metrics or {}).get('checkpoints',{})
         stressed=replace(risk,fee_pct=risk.fee_pct*2,slippage_pct=risk.slippage_pct*2)
-        stress=PortfolioBacktestEngine(data,initial_cash=initial,risk=stressed,
-            select_assets=False,model_factory=factory,strategy_id=row.candidate_id,
-            start_date=start,end_date=end,liquidate_end=False,timeframe=timeframe,
-            allow_no_trade_gaps=timeframe=='15m').run(**run_settings)
-        benchmark=_momentum_benchmark(data,risk,initial,start,end,benchmark_cache,liquidate_end=False,
-                                     timeframe=timeframe,warmup=warmup if timeframe=='15m' else None)
+        scenarios={'normal':common,'stress':{**common,'risk':stressed},
+                   'benchmark':{**common,'risk':replace(risk,entry_strategy='momentum'),
+                                'model_factory':None,'strategy_id':'momentum'}}
+        outcomes={}; telemetry={}
+        try:
+            for name,arguments in scenarios.items():
+                outcomes[name],telemetry[name]=_shadow_replay(arguments,run_settings,checkpoints.get(name),mode)
+        except CheckpointInvalid as exc:
+            # No revised evidence may silently replace the already-persisted
+            # virtual ledger. Preserve it and require a new qualified version.
+            row.status='REJECTED'; run.status='INVALIDATED'
+            row.metrics={**(row.metrics or {}),'shadow_rejection':str(exc)}
+            run.metrics={**(run.metrics or {}),'checkpoint_error':str(exc)}
+            updates.append({'candidate_id':row.candidate_id,'status':row.status,'reason':str(exc)})
+            continue
+        shadow=outcomes['normal']; stress=outcomes['stress']; benchmark=outcomes['benchmark']
         decision=shadow_promotion_decision(shadow,stress,benchmark,observed)
         requested_status=decision['decision']
         # Arbitration below guarantees that only one controller can own live
@@ -371,8 +411,15 @@ def advance_shadow_candidates(db,user_id,now=None,data_snapshot=None,benchmark_c
         row.metrics={**(row.metrics or {}),'shadow':_summary(shadow),
                      'shadow_stress':_summary(stress),'shadow_momentum_benchmark':_summary(benchmark),
                      'shadow_promotion':decision,'shadow_updated_at':now.isoformat()}
-        existing_intents={value[0] for value in db.query(ShadowTrade.intent_key).filter_by(run_id=run.id)}
-        for trade in shadow.get('trades',[]):
+        previous_normal=checkpoints.get('normal',{}).get('state',{})
+        prior_trades=len(previous_normal.get('engine',{}).get('trades',[]))
+        prior_points=len(previous_normal.get('timeline',[]))
+        new_trades=shadow.get('trades',[])[prior_trades:]
+        new_intents=[digest({'candidate':row.candidate_id,'symbol':trade['symbol'],
+                           'side':trade['side'],'timestamp':trade['timestamp']}) for trade in new_trades]
+        existing_intents={value[0] for value in db.query(ShadowTrade.intent_key).filter(
+            ShadowTrade.run_id==run.id,ShadowTrade.intent_key.in_(new_intents))} if new_intents else set()
+        for trade in new_trades:
             intent=digest({'candidate':row.candidate_id,'symbol':trade['symbol'],
                            'side':trade['side'],'timestamp':trade['timestamp']})
             if intent in existing_intents: continue
@@ -380,9 +427,11 @@ def advance_shadow_candidates(db,user_id,now=None,data_snapshot=None,benchmark_c
                 side=trade['side'],quantity=trade['quantity'],price=trade['price'],
                 fee=trade['fee'],pnl=trade.get('pnl'),candle_timestamp=trade['timestamp']))
             existing_intents.add(intent)
-        existing_equity={utc(value[0]) for value in db.query(ShadowEquity.candle_timestamp).filter_by(run_id=run.id)}
-        peak=initial
-        for point in shadow.get('equity_curve',[]):
+        new_points=shadow.get('equity_curve',[])[prior_points:]
+        existing_equity={utc(value[0]) for value in db.query(ShadowEquity.candle_timestamp).filter(
+            ShadowEquity.run_id==run.id,ShadowEquity.candle_timestamp.in_([point['timestamp'] for point in new_points]))} if new_points else set()
+        peak=run.peak_equity if prior_points else initial
+        for point in new_points:
             stamp=point['timestamp']
             peak=max(peak,float(point['equity']))
             if stamp in existing_equity: continue
@@ -400,7 +449,9 @@ def advance_shadow_candidates(db,user_id,now=None,data_snapshot=None,benchmark_c
         run.peak_equity=max(peak,run.equity)
         run.open_positions=positions
         run.metrics={'shadow':_summary(shadow),'stress':_summary(stress),
-                     'benchmark':_summary(benchmark),'promotion':decision}
+                     'benchmark':_summary(benchmark),'promotion':decision,
+                     'checkpoints':{name:outcome['replay_checkpoint'] for name,outcome in outcomes.items()
+                                    if 'replay_checkpoint' in outcome},'replay':telemetry}
         update={'candidate_id':row.candidate_id,'status':row.status,
                 'observed_days':observed,'closed_trades':shadow.get('closed_trades',0)}
         updates.append(update)
@@ -529,6 +580,9 @@ def research_status(db,user_id,now=None):
             'failed_checks':failed,'canary':metrics.get('canary'),
             'promotion_reason':(metrics.get('canary_selection') or {}).get('reason'),
             'shadow_rejection':metrics.get('shadow_rejection'),
+            'shadow_replay':(run.metrics or {}).get('replay') if run else None,
+            'cost_attribution':(metrics.get('shadow') or {}).get('cost_attribution') or
+                               (metrics.get('development') or {}).get('cost_attribution'),
             'research_revisions':len(metrics.get('revisions',[])),
             'stopped_stage':metrics.get('stopped_stage'),
             'validation_windows':metrics.get('validation_windows',[]),

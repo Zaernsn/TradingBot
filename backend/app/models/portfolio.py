@@ -4,6 +4,25 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 
+class MarketObservation(Base):
+    """Public market evidence; received_at is the earliest replay availability."""
+    __tablename__ = 'market_observations'
+    id = Column(Integer, primary_key=True)
+    exchange = Column(String, nullable=False, default='kraken')
+    symbol = Column(String, nullable=False)
+    bucket_at = Column(DateTime(timezone=True), nullable=False)
+    requested_at = Column(DateTime(timezone=True), nullable=False)
+    received_at = Column(DateTime(timezone=True), nullable=False)
+    quote_at = Column(DateTime(timezone=True), nullable=True)
+    book_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String, nullable=False)
+    evidence = Column(JSON, nullable=False)
+    __table_args__ = (
+        UniqueConstraint('exchange','symbol','bucket_at',name='uq_market_observation_bucket'),
+        Index('ix_market_observation_symbol_received','symbol','received_at'),
+    )
+
+
 class Portfolio(Base):
     __tablename__ = "portfolios"
 

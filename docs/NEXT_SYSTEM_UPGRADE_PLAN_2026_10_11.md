@@ -4,6 +4,10 @@ Date: 11 October 2026
 Baseline implementation commit: `bf6ed5d`
 Status: proposed implementation sequence; no deployment or trading activation performed.
 
+Implementation checkpoint: incremental shadow replay with persistence, full-replay comparison, and timing telemetry is now implemented locally. See [the release report](INCREMENTAL_SHADOW_RELEASE_2026_10_11.md). The full suite passes 301 tests; the synthetic replay benchmark measures 5.39–7.64× faster updates. Database/network time is excluded. Quote collection, feature caching, execution-cost attribution, and the later research/allocation phases remain outstanding.
+
+Subsequent checkpoint: bounded public quote/depth collection, live execution-cost summaries, replay cost attribution, saved development-loss diagnosis and Strategy Lab displays are implemented locally. See [the execution-cost release](EXECUTION_COST_EVIDENCE_RELEASE_2026_10_11.md). Collection starts after deployment; continuous quote replay, longer retention/export, feature caching, regime attribution and later research/allocation phases remain outstanding.
+
 ## Objective
 
 Find useful strategies with less repeated computation and more credible evidence. Improve net performance, execution reliability, and visibility into decisions. A successful research cycle can reject every candidate; profitability is not an assumed outcome.

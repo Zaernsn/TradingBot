@@ -61,6 +61,7 @@ export const marketApi = {
 export const botApi = {
   getState: () => api.get('/bot/state'),
   getResearchStatus: () => api.get('/bot/research/status'),
+  getExecutionCosts: () => api.get('/bot/research/execution-costs'),
   exportResearchMetadata: () => api.get('/bot/research/metadata/export'),
   importResearchMetadata: (payload: unknown) => api.post('/bot/research/metadata/import', payload),
   start: () => api.post('/bot/start'),

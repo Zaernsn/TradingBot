@@ -20,7 +20,7 @@ def migrate():
         if tables and not versioned:
             legacy={'users','portfolios','positions','trades','signals','bot_states','risk_configs'}
             extras=tables-legacy
-            if not legacy.issubset(tables) or extras-{'execution_orders','market_candles','password_reset_tokens','auth_rate_limits','kraken_snapshots','research_snapshots','model_recoveries','strategy_candidates','shadow_runs','shadow_trades','shadow_equity','equity_checkpoints'}:
+            if not legacy.issubset(tables) or extras-{'execution_orders','market_candles','password_reset_tokens','auth_rate_limits','kraken_snapshots','research_snapshots','model_recoveries','strategy_candidates','shadow_runs','shadow_trades','shadow_equity','equity_checkpoints','market_observations'}:
                 raise RuntimeError('Unversioned database has an unknown layout; back up and reconcile its migration baseline')
             with engine.connect() as connection:
                 for name in extras:

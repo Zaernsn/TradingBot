@@ -35,4 +35,9 @@ const intraday = render({ counts: { PAPER_APPROVED: 1 }, candidates: [{ ...candi
 assert.match(intraday, /15-minute breakout/);
 assert.match(intraday, /15-minute evidence/);
 assert.match(intraday, /five families/);
+const costs = render({ counts: { REJECTED: 1 }, candidates: [{ ...candidate,
+  cost_attribution: { net_pnl: -10, closed_fees: 9, modeled_slippage: null, closed_trades: 3 } }] });
+assert.match(costs, /fees €9.00/);
+assert.match(costs, /modeled slippage unavailable/);
+assert.match(costs, /not a zero-cost strategy test/);
 console.log('Strategy lab rendering: loading, evidence, automatic policy and escaped errors passed.');

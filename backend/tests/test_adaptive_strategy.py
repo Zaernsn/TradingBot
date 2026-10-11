@@ -504,7 +504,7 @@ def test_new_forward_winner_promotes_automatically_even_with_legacy_manual_flag(
               final_equity=108,ending_cash=108,trades=[],equity_curve=[],top_five_profit_share=.25)
     class FakeEngine:
         def __init__(self,*args,**kwargs): self.benchmark=kwargs['risk'].entry_strategy=='momentum'
-        def run(self): return {**good,'total_return_pct':0 if self.benchmark else .08}
+        def run(self,**kwargs): return {**good,'total_return_pct':0 if self.benchmark else .08}
     monkeypatch.setattr(research,'_research_data',lambda db:{f'C{i}/EUR':rows for i in range(3)})
     monkeypatch.setattr(research,'PortfolioBacktestEngine',FakeEngine)
     result=advance_shadow_candidates(c.db,c.user.id,start+timedelta(hours=1001))

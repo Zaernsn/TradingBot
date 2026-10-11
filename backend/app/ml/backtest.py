@@ -14,7 +14,8 @@ from dataclasses import asdict, replace
 from app.ml.evaluation import curve_metrics, digest
 from app.ml.strategies import (
     rank_entries, MomentumModel, FastMomentumModel, AdaptiveMomentumModel,
-    classify_market_regime,
+    classify_market_regime, VolatilityTrendModel, BreakoutLiquidityModel,
+    DefensiveMeanReversionModel, IntradayBreakoutModel,
 )
 from app.services.trading_service import exit_reason
 
@@ -86,7 +87,7 @@ class PortfolioBacktestEngine:
         return [OHLCV(day,rows[0].open,max(c.high for c in rows),min(c.low for c in rows),rows[-1].close,sum(c.volume for c in rows))
                 for day,rows in sorted(grouped.items()) if len(rows)==self.bars_per_day]
 
-    def run(self,horizon=None,warmup=None,retrain_every=None):
+    def run(self,horizon=None,warmup=None,retrain_every=None,checkpoint=None,save_checkpoint=False):
         if retrain_every is None:
             retrain_every=24*self.bars_per_hour
         if warmup is None:
@@ -123,7 +124,41 @@ class PortfolioBacktestEngine:
         watchlist=[]; first_prices={}; last_prices={}; daily_counts=defaultdict(int)
         risk=replace(self.risk,prediction_horizon=horizon)
         first_stamps={}; last_stamps={}
-        for step,stamp in enumerate(timeline):
+        # Only these rule models are stateless between fits. Learned models need
+        # an explicit training-state protocol before they can resume safely.
+        configuration=None; processed=0
+        if checkpoint is not None or save_checkpoint:
+            from app.ml.replay_checkpoint import CheckpointInvalid, restore
+            supported={MomentumModel,FastMomentumModel,AdaptiveMomentumModel,VolatilityTrendModel,
+                       BreakoutLiquidityModel,DefensiveMeanReversionModel,IntradayBreakoutModel}
+            if self.liquidate_end or self.select_assets or any(type(model) not in supported for model in models.values()):
+                raise ValueError('Checkpoint replay requires non-liquidating, explicit-universe rule strategies')
+            from app.services.research_service import code_identity
+            def model_settings(model):
+                return {key:(model_settings(value) if hasattr(value,'__dict__') else value)
+                        for key,value in vars(model).items() if key not in {'is_fitted','regime'}}
+            configuration=digest({'code':code_identity(),'risk':asdict(risk),'warmup':warmup,
+                'retrain_every':retrain_every,'strategy':self.strategy_id,'start':self.start_date,
+                'initial':self.initial_cash,'timeframe':self.timeframe,'gaps':self.allow_no_trade_gaps,
+                'intrabar':self.intrabar_stops,'participation':self.participation_rate,
+                'minimum':self.minimum_order_eur,'exit':asdict(self.exit_experiment),
+                'models':{symbol:{'type':type(model).__name__,'settings':model_settings(model)}
+                          for symbol,model in models.items()}})
+            if checkpoint is not None:
+                state=restore(checkpoint,configuration)
+                saved_timeline=state['timeline']; processed=len(saved_timeline)
+                if timeline[:processed]!=saved_timeline:
+                    raise CheckpointInvalid('Processed candle timeline changed or history was removed')
+                if self._checkpoint_prefix(saved_timeline[-1] if saved_timeline else None)!=checkpoint['prefix']:
+                    raise CheckpointInvalid('Processed candle data changed or history was removed')
+                for name,value in state['engine'].items():
+                    setattr(self,name,self.limitations | set(value) if name=='limitations' else value)
+                self.positions={symbol:SimpleNamespace(**values) for symbol,values in state['positions'].items()}
+                daily_counts=defaultdict(int,{datetime.fromisoformat(key).date():value for key,value in state['daily_counts'].items()})
+                first_prices=state['first_prices']; last_prices=state['last_prices']
+                first_stamps=state['first_stamps']; last_stamps=state['last_stamps']
+        for step in range(processed,len(timeline)):
+            stamp=timeline[step]
             current={s:rows[index[s][stamp]] for s,rows in self.data.items() if stamp in index[s]}
             past={s:self.data[s][max(segment_start[s][index[s][stamp]],index[s][stamp]-8760):index[s][stamp]] for s in current}
             eligible={s for s in current if len(past[s])>=warmup}
@@ -249,7 +284,28 @@ class PortfolioBacktestEngine:
         if self.timeframe=='15m':
             result['bar_mean_return_interval']=result.pop('hourly_mean_return_interval')
         result['timeframe']=self.timeframe
+        from app.ml.cost_attribution import attribution
+        result['cost_attribution']=attribution(result)
+        if configuration is not None:
+            from app.ml.replay_checkpoint import seal
+            names=('cash','trades','curve','cash_curve','peak','halted','fees','turnover',
+                   'exposures','limitations','curve_timestamps','last_exits')
+            state={'timeline':timeline,'engine':{name:(sorted(self.limitations-{'Some assets lack full-period benchmark coverage'}) if name=='limitations'
+                    else getattr(self,name)) for name in names},
+                   'positions':{symbol:vars(position) for symbol,position in self.positions.items()},
+                   'daily_counts':{day.isoformat():count for day,count in daily_counts.items()},
+                   'first_prices':first_prices,'last_prices':last_prices,
+                   'first_stamps':first_stamps,'last_stamps':last_stamps}
+            result['replay_checkpoint']=seal(configuration,self._checkpoint_prefix(timeline[-1] if timeline else None),state)
+            result['replay_work']={'processed_bars':len(timeline)-processed,'total_bars':len(timeline),
+                                   'resumed':checkpoint is not None}
         return result
+
+    def _checkpoint_prefix(self, last):
+        # Include warmup and every observed market, even bars before evaluation.
+        # A rolling/truncated snapshot cannot silently reuse old evidence.
+        return digest({symbol:[vars(row) for row in rows if last is None or row.timestamp<=last]
+                       for symbol,rows in self.data.items()})
 
     def _trade(self,symbol,side,quantity,price,fee,pnl,stamp):
         self.fees+=fee; self.turnover+=quantity*price

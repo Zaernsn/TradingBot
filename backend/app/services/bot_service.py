@@ -136,10 +136,20 @@ class BotOrchestrator:
         collection=None
         if users:
             from app.services.research_market_data import collect_intraday_history
+            from app.services.market_observations import collect_market_observations
             public_exchange=PaperExchange()  # No account credentials or live order methods.
             try:
-                with SessionLocal() as db:
-                    collection=await collect_intraday_history(db,public_exchange,symbols or CURATED_PAIRS)
+                try:
+                    with SessionLocal() as db:
+                        collection=await collect_intraday_history(db,public_exchange,symbols or CURATED_PAIRS)
+                except Exception as exc:
+                    collection={'timeframe':'15m','errors':{'collection':type(exc).__name__}}
+                try:
+                    with SessionLocal() as db:
+                        collection['execution_observations']=await collect_market_observations(
+                            db,public_exchange,symbols or CURATED_PAIRS)
+                except Exception as exc:
+                    collection['execution_observations']={'errors':{'collection':type(exc).__name__}}
             except Exception as exc:
                 collection={'timeframe':'15m','errors':{'collection':type(exc).__name__}}
             finally:

@@ -1,0 +1,77 @@
+{
+  "created_at": "2026-10-11T17:58:12.880190+00:00",
+  "code_identity": "c587ce18a10544e4429d536c7a5f40f034e3635fe3b9a4e1e36cf5f3e380b516",
+  "fixture": "deterministic synthetic three-market history; not a performance/edge study",
+  "input_bars_per_market": 720,
+  "new_bars": 5,
+  "repeats": 3,
+  "scope": "engine construction, replay, integrity hashes, statistics, checkpoint serialization; excludes database/network",
+  "measurements": [
+    {
+      "timeframe": "1h",
+      "scenario": "normal",
+      "parity_verified": true,
+      "full_bars": 690,
+      "incremental_bars": 5,
+      "duplicate_bars": 0,
+      "full_seconds_median": 0.5546870999969542,
+      "incremental_seconds_median": 0.08558349998202175,
+      "speedup": 6.481238791513265
+    },
+    {
+      "timeframe": "1h",
+      "scenario": "stress",
+      "parity_verified": true,
+      "full_bars": 690,
+      "incremental_bars": 5,
+      "duplicate_bars": 0,
+      "full_seconds_median": 0.6480004999903031,
+      "incremental_seconds_median": 0.1049570000031963,
+      "speedup": 6.173961717375394
+    },
+    {
+      "timeframe": "1h",
+      "scenario": "benchmark",
+      "parity_verified": true,
+      "full_bars": 690,
+      "incremental_bars": 5,
+      "duplicate_bars": 0,
+      "full_seconds_median": 0.549106499995105,
+      "incremental_seconds_median": 0.10185230005299672,
+      "speedup": 5.391203730395768
+    },
+    {
+      "timeframe": "15m",
+      "scenario": "normal",
+      "parity_verified": true,
+      "full_bars": 623,
+      "incremental_bars": 5,
+      "duplicate_bars": 0,
+      "full_seconds_median": 0.7393013999680988,
+      "incremental_seconds_median": 0.10693910002009943,
+      "speedup": 6.913293639362456
+    },
+    {
+      "timeframe": "15m",
+      "scenario": "stress",
+      "parity_verified": true,
+      "full_bars": 623,
+      "incremental_bars": 5,
+      "duplicate_bars": 0,
+      "full_seconds_median": 0.8070245999842882,
+      "incremental_seconds_median": 0.10563569999067113,
+      "speedup": 7.639695671591687
+    },
+    {
+      "timeframe": "15m",
+      "scenario": "benchmark",
+      "parity_verified": true,
+      "full_bars": 623,
+      "incremental_bars": 5,
+      "duplicate_bars": 0,
+      "full_seconds_median": 0.732892699947115,
+      "incremental_seconds_median": 0.12674649996915832,
+      "speedup": 5.782350598442185
+    }
+  ]
+}

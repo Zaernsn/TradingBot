@@ -1,0 +1,1175 @@
+{
+  "study": "Existing frozen development artifacts only",
+  "reports": [
+    {
+      "variant": "short",
+      "source": "C:\\Users\\danie\\trading-bot\\research-runs\\intraday-short-20261011\\development-intraday-breakout-20261011T171905702255.json",
+      "source_sha256": "84c04f71f25b76923ad97ca2b97904db919c84e42511c994419edb33a400fd07",
+      "scenarios": {
+        "result": {
+          "closed_trades": 44,
+          "net_pnl": -49.568060087587995,
+          "closed_fees": 43.53497348464477,
+          "modeled_slippage": 5.441871094364815,
+          "same_fill_path_before_fees_pnl": -6.0330866029432215,
+          "same_fill_path_before_modeled_costs_pnl": -0.5912155085784061,
+          "average_holding_hours": 5.005681818181818,
+          "fee_share_of_net_loss": 0.8782868122681701,
+          "total_recorded_fees": 43.53497348464477,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -49.56806008758804,
+          "equity_reconciliation_residual": -4.263256414560601e-14,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 1,
+                "net_pnl": -1.4058822771443684,
+                "closed_fees": 1.3103863776003644,
+                "modeled_slippage": 0.1637983655024981,
+                "same_fill_path_before_fees_pnl": -0.09549589954400406,
+                "same_fill_path_before_modeled_costs_pnl": 0.06830246595849404,
+                "average_holding_hours": 3.25,
+                "fee_share_of_net_loss": 0.9320740426872899
+              },
+              "DOGE/EUR": {
+                "closed_trades": 16,
+                "net_pnl": -24.359097786679843,
+                "closed_fees": 13.791410702428777,
+                "modeled_slippage": 1.7239174940339346,
+                "same_fill_path_before_fees_pnl": -10.567687084251066,
+                "same_fill_path_before_modeled_costs_pnl": -8.843769590217132,
+                "average_holding_hours": 4.640625,
+                "fee_share_of_net_loss": 0.5661708337149606
+              },
+              "ETH/EUR": {
+                "closed_trades": 9,
+                "net_pnl": -9.67947198469575,
+                "closed_fees": 10.624280743671722,
+                "modeled_slippage": 1.3280373658050304,
+                "same_fill_path_before_fees_pnl": 0.9448087589759719,
+                "same_fill_path_before_modeled_costs_pnl": 2.2728461247810023,
+                "average_holding_hours": 4.833333333333333,
+                "fee_share_of_net_loss": 1.0976095349487878
+              },
+              "PEPE/EUR": {
+                "closed_trades": 3,
+                "net_pnl": -0.5569860859386933,
+                "closed_fees": 1.2294712155679088,
+                "modeled_slippage": 0.15368472811583767,
+                "same_fill_path_before_fees_pnl": 0.6724851296292156,
+                "same_fill_path_before_modeled_costs_pnl": 0.8261698577450532,
+                "average_holding_hours": 4.083333333333333,
+                "fee_share_of_net_loss": 2.207364324902068
+              },
+              "SOL/EUR": {
+                "closed_trades": 15,
+                "net_pnl": -13.566621953129342,
+                "closed_fees": 16.579424445376006,
+                "modeled_slippage": 2.0724331409075147,
+                "same_fill_path_before_fees_pnl": 3.0128024922466636,
+                "same_fill_path_before_modeled_costs_pnl": 5.085235633154179,
+                "average_holding_hours": 5.8,
+                "fee_share_of_net_loss": 1.2220746256994148
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 27,
+                "net_pnl": -28.5280694643445,
+                "closed_fees": 25.63756393866442,
+                "modeled_slippage": 3.20469580652316,
+                "same_fill_path_before_fees_pnl": -2.89050552568008,
+                "same_fill_path_before_modeled_costs_pnl": 0.31419028084307987,
+                "average_holding_hours": 5.5092592592592595,
+                "fee_share_of_net_loss": 0.8986785443265711
+              },
+              "2025-09": {
+                "closed_trades": 10,
+                "net_pnl": -11.05928407396575,
+                "closed_fees": 10.50774099437049,
+                "modeled_slippage": 1.3134683862215628,
+                "same_fill_path_before_fees_pnl": -0.5515430795952607,
+                "same_fill_path_before_modeled_costs_pnl": 0.7619253066263021,
+                "average_holding_hours": 3.95,
+                "fee_share_of_net_loss": 0.9501285005515295
+              },
+              "2025-10": {
+                "closed_trades": 7,
+                "net_pnl": -9.980706549277745,
+                "closed_fees": 7.389668551609864,
+                "modeled_slippage": 0.9237069016200927,
+                "same_fill_path_before_fees_pnl": -2.591037997667881,
+                "same_fill_path_before_modeled_costs_pnl": -1.667331096047788,
+                "average_holding_hours": 4.571428571428571,
+                "fee_share_of_net_loss": 0.7403953332486886
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 44,
+                "net_pnl": -49.568060087587995,
+                "closed_fees": 43.53497348464477,
+                "modeled_slippage": 5.441871094364815,
+                "same_fill_path_before_fees_pnl": -6.0330866029432215,
+                "same_fill_path_before_modeled_costs_pnl": -0.5912155085784061,
+                "average_holding_hours": 5.005681818181818,
+                "fee_share_of_net_loss": 0.8782868122681701
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        },
+        "cost_stress": {
+          "closed_trades": 35,
+          "net_pnl": -49.39984101225113,
+          "closed_fees": 47.338812524828725,
+          "modeled_slippage": 5.9173669909576025,
+          "same_fill_path_before_fees_pnl": -2.061028487422405,
+          "same_fill_path_before_modeled_costs_pnl": 3.8563385035351976,
+          "average_holding_hours": 4.171428571428572,
+          "fee_share_of_net_loss": 0.9582786412832529,
+          "total_recorded_fees": 47.338812524828725,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -49.399841012251045,
+          "equity_reconciliation_residual": 8.526512829121202e-14,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 2,
+                "net_pnl": -4.069293561534044,
+                "closed_fees": 2.86605059982295,
+                "modeled_slippage": 0.3582529450178048,
+                "same_fill_path_before_fees_pnl": -1.2032429617110942,
+                "same_fill_path_before_modeled_costs_pnl": -0.8449900166932894,
+                "average_holding_hours": 3.25,
+                "fee_share_of_net_loss": 0.7043115854100496
+              },
+              "DOGE/EUR": {
+                "closed_trades": 9,
+                "net_pnl": -12.629773409917206,
+                "closed_fees": 12.563375326300427,
+                "modeled_slippage": 1.5704279319069328,
+                "same_fill_path_before_fees_pnl": -0.06639808361677879,
+                "same_fill_path_before_modeled_costs_pnl": 1.504029848290154,
+                "average_holding_hours": 4.055555555555555,
+                "fee_share_of_net_loss": 0.9947427335818518
+              },
+              "ETH/EUR": {
+                "closed_trades": 9,
+                "net_pnl": -17.585216987366817,
+                "closed_fees": 14.171858845151942,
+                "modeled_slippage": 1.7714757881145704,
+                "same_fill_path_before_fees_pnl": -3.413358142214875,
+                "same_fill_path_before_modeled_costs_pnl": -1.6418823541003047,
+                "average_holding_hours": 3.7222222222222223,
+                "fee_share_of_net_loss": 0.8058961601288728
+              },
+              "PEPE/EUR": {
+                "closed_trades": 4,
+                "net_pnl": -0.15905745018920875,
+                "closed_fees": 2.0611149905972184,
+                "modeled_slippage": 0.25764801264686177,
+                "same_fill_path_before_fees_pnl": 1.9020575404080096,
+                "same_fill_path_before_modeled_costs_pnl": 2.1597055530548714,
+                "average_holding_hours": 4.625,
+                "fee_share_of_net_loss": 12.958305242196412
+              },
+              "SOL/EUR": {
+                "closed_trades": 11,
+                "net_pnl": -14.956499603243852,
+                "closed_fees": 15.676412762956188,
+                "modeled_slippage": 1.9595623132714328,
+                "same_fill_path_before_fees_pnl": 0.7199131597123358,
+                "same_fill_path_before_modeled_costs_pnl": 2.6794754729837686,
+                "average_holding_hours": 4.636363636363637,
+                "fee_share_of_net_loss": 1.0481337999404752
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 3,
+                "net_pnl": -5.175382764443234,
+                "closed_fees": 4.70455922626519,
+                "modeled_slippage": 0.5880703722704864,
+                "same_fill_path_before_fees_pnl": -0.4708235381780437,
+                "same_fill_path_before_modeled_costs_pnl": 0.11724683409244274,
+                "average_holding_hours": 4.583333333333333,
+                "fee_share_of_net_loss": 0.9090263349383986
+              },
+              "2025-10": {
+                "closed_trades": 6,
+                "net_pnl": -5.861059658967643,
+                "closed_fees": 6.258425658048757,
+                "modeled_slippage": 0.7823079259517949,
+                "same_fill_path_before_fees_pnl": 0.3973659990811136,
+                "same_fill_path_before_modeled_costs_pnl": 1.1796739250329085,
+                "average_holding_hours": 5.208333333333333,
+                "fee_share_of_net_loss": 1.0677976376632046
+              },
+              "2025-11": {
+                "closed_trades": 5,
+                "net_pnl": -3.5639652207989094,
+                "closed_fees": 5.864008115825986,
+                "modeled_slippage": 0.7330131467024104,
+                "same_fill_path_before_fees_pnl": 2.300042895027077,
+                "same_fill_path_before_modeled_costs_pnl": 3.033056041729487,
+                "average_holding_hours": 5.3999999999999995,
+                "fee_share_of_net_loss": 1.6453606453857292
+              },
+              "2025-12": {
+                "closed_trades": 8,
+                "net_pnl": -12.661929448048758,
+                "closed_fees": 13.146310553040067,
+                "modeled_slippage": 1.6432973298437343,
+                "same_fill_path_before_fees_pnl": 0.48438110499130893,
+                "same_fill_path_before_modeled_costs_pnl": 2.127678434835043,
+                "average_holding_hours": 3.875,
+                "fee_share_of_net_loss": 1.0382549205457745
+              },
+              "2026-01": {
+                "closed_trades": 2,
+                "net_pnl": -4.444846097483569,
+                "closed_fees": 3.177844404005218,
+                "modeled_slippage": 0.3972270714021636,
+                "same_fill_path_before_fees_pnl": -1.2670016934783508,
+                "same_fill_path_before_modeled_costs_pnl": -0.8697746220761872,
+                "average_holding_hours": 2.75,
+                "fee_share_of_net_loss": 0.7149503794528097
+              },
+              "2026-02": {
+                "closed_trades": 4,
+                "net_pnl": -3.6068716203846325,
+                "closed_fees": 3.9816328569257284,
+                "modeled_slippage": 0.49770759699105516,
+                "same_fill_path_before_fees_pnl": 0.37476123654109594,
+                "same_fill_path_before_modeled_costs_pnl": 0.8724688335321511,
+                "average_holding_hours": 4.125,
+                "fee_share_of_net_loss": 1.1039020170341223
+              },
+              "2026-03": {
+                "closed_trades": 7,
+                "net_pnl": -14.08578620212438,
+                "closed_fees": 10.20603171071778,
+                "modeled_slippage": 1.2757435477959578,
+                "same_fill_path_before_fees_pnl": -3.879754491406601,
+                "same_fill_path_before_modeled_costs_pnl": -2.604010943610643,
+                "average_holding_hours": 3.0,
+                "fee_share_of_net_loss": 0.7245624464453772
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 35,
+                "net_pnl": -49.39984101225113,
+                "closed_fees": 47.338812524828725,
+                "modeled_slippage": 5.9173669909576025,
+                "same_fill_path_before_fees_pnl": -2.061028487422405,
+                "same_fill_path_before_modeled_costs_pnl": 3.8563385035351976,
+                "average_holding_hours": 4.171428571428572,
+                "fee_share_of_net_loss": 0.9582786412832529
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        },
+        "momentum_baseline": {
+          "closed_trades": 83,
+          "net_pnl": -42.24641775537034,
+          "closed_fees": 69.61868668739174,
+          "modeled_slippage": 8.702371910564308,
+          "same_fill_path_before_fees_pnl": 27.372268932021406,
+          "same_fill_path_before_modeled_costs_pnl": 36.074640842585715,
+          "average_holding_hours": 17.367469879518072,
+          "fee_share_of_net_loss": 1.647919288459478,
+          "total_recorded_fees": 69.61868668739174,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -42.24641775537026,
+          "equity_reconciliation_residual": 7.815970093361102e-14,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 10,
+                "net_pnl": -15.445301262759216,
+                "closed_fees": 10.246023875401647,
+                "modeled_slippage": 1.2807490658967835,
+                "same_fill_path_before_fees_pnl": -5.199277387357569,
+                "same_fill_path_before_modeled_costs_pnl": -3.9185283214607853,
+                "average_holding_hours": 18.65,
+                "fee_share_of_net_loss": 0.6633748154920257
+              },
+              "DOGE/EUR": {
+                "closed_trades": 20,
+                "net_pnl": -7.982643362955934,
+                "closed_fees": 11.566675087916105,
+                "modeled_slippage": 1.4458394158605778,
+                "same_fill_path_before_fees_pnl": 3.5840317249601705,
+                "same_fill_path_before_modeled_costs_pnl": 5.029871140820749,
+                "average_holding_hours": 17.55,
+                "fee_share_of_net_loss": 1.448978059271963
+              },
+              "ETH/EUR": {
+                "closed_trades": 19,
+                "net_pnl": -8.884146512089696,
+                "closed_fees": 21.441886282682752,
+                "modeled_slippage": 2.6802510233259884,
+                "same_fill_path_before_fees_pnl": 12.557739770593056,
+                "same_fill_path_before_modeled_costs_pnl": 15.237990793919044,
+                "average_holding_hours": 19.276315789473685,
+                "fee_share_of_net_loss": 2.4134998509428307
+              },
+              "PEPE/EUR": {
+                "closed_trades": 6,
+                "net_pnl": 0.34367334166811375,
+                "closed_fees": 2.038675739286097,
+                "modeled_slippage": 0.2548371045969294,
+                "same_fill_path_before_fees_pnl": 2.3823490809542105,
+                "same_fill_path_before_modeled_costs_pnl": 2.63718618555114,
+                "average_holding_hours": 16.041666666666668,
+                "fee_share_of_net_loss": null
+              },
+              "SOL/EUR": {
+                "closed_trades": 28,
+                "net_pnl": -10.277999959233602,
+                "closed_fees": 24.325425702105136,
+                "modeled_slippage": 3.0406953008840296,
+                "same_fill_path_before_fees_pnl": 14.047425742871534,
+                "same_fill_path_before_modeled_costs_pnl": 17.088121043755564,
+                "average_holding_hours": 15.767857142857142,
+                "fee_share_of_net_loss": 2.3667470129002615
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 66,
+                "net_pnl": -27.233032164089966,
+                "closed_fees": 55.82973887762444,
+                "modeled_slippage": 6.978752935162303,
+                "same_fill_path_before_fees_pnl": 28.596706713534477,
+                "same_fill_path_before_modeled_costs_pnl": 35.57545964869678,
+                "average_holding_hours": 17.511363636363637,
+                "fee_share_of_net_loss": 2.050074282629559
+              },
+              "2025-09": {
+                "closed_trades": 17,
+                "net_pnl": -15.013385591280366,
+                "closed_fees": 13.788947809767297,
+                "modeled_slippage": 1.723618975402005,
+                "same_fill_path_before_fees_pnl": -1.2244377815130694,
+                "same_fill_path_before_modeled_costs_pnl": 0.49918119388893567,
+                "average_holding_hours": 16.808823529411764,
+                "fee_share_of_net_loss": 0.9184435932809045
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 83,
+                "net_pnl": -42.24641775537034,
+                "closed_fees": 69.61868668739174,
+                "modeled_slippage": 8.702371910564308,
+                "same_fill_path_before_fees_pnl": 27.372268932021406,
+                "same_fill_path_before_modeled_costs_pnl": 36.074640842585715,
+                "average_holding_hours": 17.367469879518072,
+                "fee_share_of_net_loss": 1.647919288459478
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        }
+      },
+      "new_strategy_evaluation": false,
+      "holdout_consumed": false
+    },
+    {
+      "variant": "medium",
+      "source": "C:\\Users\\danie\\trading-bot\\research-runs\\intraday-medium-20261011\\development-intraday-breakout-20261011T171908492608.json",
+      "source_sha256": "65603a0e8e362708daa32403f0e70a087e3aa44f3240c6427797d138be14b45f",
+      "scenarios": {
+        "result": {
+          "closed_trades": 55,
+          "net_pnl": -49.982032055122374,
+          "closed_fees": 50.33144535988308,
+          "modeled_slippage": 6.291437310835661,
+          "same_fill_path_before_fees_pnl": 0.3494133047607022,
+          "same_fill_path_before_modeled_costs_pnl": 6.640850615596364,
+          "average_holding_hours": 5.068181818181818,
+          "fee_share_of_net_loss": 1.0069907782935947,
+          "total_recorded_fees": 50.33144535988308,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -49.982032055122374,
+          "equity_reconciliation_residual": 0.0,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 1,
+                "net_pnl": -1.1228646804812454,
+                "closed_fees": 1.0465930221269266,
+                "modeled_slippage": 0.13082418231837908,
+                "same_fill_path_before_fees_pnl": -0.07627165835431882,
+                "same_fill_path_before_modeled_costs_pnl": 0.05455252396406027,
+                "average_holding_hours": 3.25,
+                "fee_share_of_net_loss": 0.93207404268729
+              },
+              "DOGE/EUR": {
+                "closed_trades": 17,
+                "net_pnl": -23.27378764182745,
+                "closed_fees": 14.444162459554164,
+                "modeled_slippage": 1.8055132833322862,
+                "same_fill_path_before_fees_pnl": -8.829625182273286,
+                "same_fill_path_before_modeled_costs_pnl": -7.024111898941,
+                "average_holding_hours": 4.926470588235294,
+                "fee_share_of_net_loss": 0.6206193285701052
+              },
+              "ETH/EUR": {
+                "closed_trades": 12,
+                "net_pnl": -8.75646251253821,
+                "closed_fees": 13.484962229710693,
+                "modeled_slippage": 1.6856266928401618,
+                "same_fill_path_before_fees_pnl": 4.7284997171724825,
+                "same_fill_path_before_modeled_costs_pnl": 6.414126410012644,
+                "average_holding_hours": 4.875,
+                "fee_share_of_net_loss": 1.5400011374915195
+              },
+              "PEPE/EUR": {
+                "closed_trades": 6,
+                "net_pnl": -0.423203467201526,
+                "closed_fees": 1.6442529371827512,
+                "modeled_slippage": 0.20553304373034706,
+                "same_fill_path_before_fees_pnl": 1.2210494699812253,
+                "same_fill_path_before_modeled_costs_pnl": 1.4265825137115724,
+                "average_holding_hours": 4.416666666666667,
+                "fee_share_of_net_loss": 3.8852539372031454
+              },
+              "SOL/EUR": {
+                "closed_trades": 19,
+                "net_pnl": -16.405713753073947,
+                "closed_fees": 19.711474711308547,
+                "modeled_slippage": 2.463940108614487,
+                "same_fill_path_before_fees_pnl": 3.3057609582346004,
+                "same_fill_path_before_modeled_costs_pnl": 5.769701066849088,
+                "average_holding_hours": 5.618421052631579,
+                "fee_share_of_net_loss": 1.201500587416698
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 25,
+                "net_pnl": -24.46539182244983,
+                "closed_fees": 24.397972756389343,
+                "modeled_slippage": 3.0497495768790115,
+                "same_fill_path_before_fees_pnl": -0.06741906606048786,
+                "same_fill_path_before_modeled_costs_pnl": 2.9823305108185236,
+                "average_holding_hours": 5.74,
+                "fee_share_of_net_loss": 0.9972443087545967
+              },
+              "2025-09": {
+                "closed_trades": 10,
+                "net_pnl": -11.326685457556438,
+                "closed_fees": 10.589235088179409,
+                "modeled_slippage": 1.3236549722269657,
+                "same_fill_path_before_fees_pnl": -0.7374503693770293,
+                "same_fill_path_before_modeled_costs_pnl": 0.5862046028499364,
+                "average_holding_hours": 3.85,
+                "fee_share_of_net_loss": 0.934892659274382
+              },
+              "2025-10": {
+                "closed_trades": 20,
+                "net_pnl": -14.189954775116105,
+                "closed_fees": 15.344237515314328,
+                "modeled_slippage": 1.9180327617296842,
+                "same_fill_path_before_fees_pnl": 1.154282740198223,
+                "same_fill_path_before_modeled_costs_pnl": 3.072315501927907,
+                "average_holding_hours": 4.8375,
+                "fee_share_of_net_loss": 1.0813450612416613
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 55,
+                "net_pnl": -49.982032055122374,
+                "closed_fees": 50.33144535988308,
+                "modeled_slippage": 6.291437310835661,
+                "same_fill_path_before_fees_pnl": 0.3494133047607022,
+                "same_fill_path_before_modeled_costs_pnl": 6.640850615596364,
+                "average_holding_hours": 5.068181818181818,
+                "fee_share_of_net_loss": 1.0069907782935947
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        },
+        "cost_stress": {
+          "closed_trades": 33,
+          "net_pnl": -42.943455202538594,
+          "closed_fees": 44.79342200363611,
+          "modeled_slippage": 5.59920754715191,
+          "same_fill_path_before_fees_pnl": 1.8499668010975157,
+          "same_fill_path_before_modeled_costs_pnl": 7.449174348249426,
+          "average_holding_hours": 4.303030303030303,
+          "fee_share_of_net_loss": 1.0430791326029154,
+          "total_recorded_fees": 44.79342200363611,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -42.94345520253859,
+          "equity_reconciliation_residual": 7.105427357601002e-15,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 2,
+                "net_pnl": -4.114267320507152,
+                "closed_fees": 2.897771181715645,
+                "modeled_slippage": 0.3622179806018257,
+                "same_fill_path_before_fees_pnl": -1.2164961387915074,
+                "same_fill_path_before_modeled_costs_pnl": -0.8542781581896817,
+                "average_holding_hours": 3.25,
+                "fee_share_of_net_loss": 0.7043225332666148
+              },
+              "DOGE/EUR": {
+                "closed_trades": 9,
+                "net_pnl": -11.707662117279007,
+                "closed_fees": 12.661090612835984,
+                "modeled_slippage": 1.5826464709043513,
+                "same_fill_path_before_fees_pnl": 0.9534284955569774,
+                "same_fill_path_before_modeled_costs_pnl": 2.536074966461329,
+                "average_holding_hours": 4.111111111111111,
+                "fee_share_of_net_loss": 1.081436283863184
+              },
+              "ETH/EUR": {
+                "closed_trades": 7,
+                "net_pnl": -11.925492126709205,
+                "closed_fees": 11.430571665343505,
+                "modeled_slippage": 1.4288251937868661,
+                "same_fill_path_before_fees_pnl": -0.4949204613656999,
+                "same_fill_path_before_modeled_costs_pnl": 0.9339047324211662,
+                "average_holding_hours": 4.142857142857143,
+                "fee_share_of_net_loss": 0.9584989486297811
+              },
+              "PEPE/EUR": {
+                "closed_trades": 4,
+                "net_pnl": -0.15960177177922444,
+                "closed_fees": 2.0620815550334237,
+                "modeled_slippage": 0.2577688353736497,
+                "same_fill_path_before_fees_pnl": 1.9024797832541993,
+                "same_fill_path_before_modeled_costs_pnl": 2.160248618627849,
+                "average_holding_hours": 4.625,
+                "fee_share_of_net_loss": 12.920167063595516
+              },
+              "SOL/EUR": {
+                "closed_trades": 11,
+                "net_pnl": -15.036431866264007,
+                "closed_fees": 15.741906988707553,
+                "modeled_slippage": 1.9677490664852177,
+                "same_fill_path_before_fees_pnl": 0.7054751224435467,
+                "same_fill_path_before_modeled_costs_pnl": 2.6732241889287645,
+                "average_holding_hours": 4.636363636363637,
+                "fee_share_of_net_loss": 1.0469177214859307
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 3,
+                "net_pnl": -3.642809590449776,
+                "closed_fees": 4.764384574608098,
+                "modeled_slippage": 0.5955549403457153,
+                "same_fill_path_before_fees_pnl": 1.1215749841583218,
+                "same_fill_path_before_modeled_costs_pnl": 1.7171299245040372,
+                "average_holding_hours": 5.0,
+                "fee_share_of_net_loss": 1.3078873480235462
+              },
+              "2025-10": {
+                "closed_trades": 6,
+                "net_pnl": -5.879212561009365,
+                "closed_fees": 6.277809283965638,
+                "modeled_slippage": 0.7847308938061719,
+                "same_fill_path_before_fees_pnl": 0.398596722956273,
+                "same_fill_path_before_modeled_costs_pnl": 1.183327616762445,
+                "average_holding_hours": 5.208333333333333,
+                "fee_share_of_net_loss": 1.0677976376632043
+              },
+              "2025-11": {
+                "closed_trades": 5,
+                "net_pnl": -3.5756098091196162,
+                "closed_fees": 5.880745732824085,
+                "modeled_slippage": 0.7351053775682109,
+                "same_fill_path_before_fees_pnl": 2.305135923704469,
+                "same_fill_path_before_modeled_costs_pnl": 3.0402413012726797,
+                "average_holding_hours": 5.4,
+                "fee_share_of_net_loss": 1.6446832978881545
+              },
+              "2025-12": {
+                "closed_trades": 8,
+                "net_pnl": -12.698823176339578,
+                "closed_fees": 13.183942996695224,
+                "modeled_slippage": 1.6480014070717994,
+                "same_fill_path_before_fees_pnl": 0.4851198203556457,
+                "same_fill_path_before_modeled_costs_pnl": 2.133121227427445,
+                "average_holding_hours": 3.875,
+                "fee_share_of_net_loss": 1.0382019509697182
+              },
+              "2026-01": {
+                "closed_trades": 1,
+                "net_pnl": -1.5082549884968268,
+                "closed_fees": 1.2375511921013014,
+                "modeled_slippage": 0.15469343497121754,
+                "same_fill_path_before_fees_pnl": -0.27070379639552544,
+                "same_fill_path_before_modeled_costs_pnl": -0.1160103614243079,
+                "average_holding_hours": 2.75,
+                "fee_share_of_net_loss": 0.8205185472880039
+              },
+              "2026-02": {
+                "closed_trades": 3,
+                "net_pnl": -2.36416261253557,
+                "closed_fees": 3.0916247071179606,
+                "modeled_slippage": 0.38645754406830435,
+                "same_fill_path_before_fees_pnl": 0.7274620945823904,
+                "same_fill_path_before_modeled_costs_pnl": 1.1139196386506947,
+                "average_holding_hours": 4.5,
+                "fee_share_of_net_loss": 1.307703916272572
+              },
+              "2026-03": {
+                "closed_trades": 7,
+                "net_pnl": -13.274582464587862,
+                "closed_fees": 10.357363516323804,
+                "modeled_slippage": 1.294663949320491,
+                "same_fill_path_before_fees_pnl": -2.9172189482640576,
+                "same_fill_path_before_modeled_costs_pnl": -1.6225549989435666,
+                "average_holding_hours": 3.0714285714285716,
+                "fee_share_of_net_loss": 0.7802402481549818
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 33,
+                "net_pnl": -42.943455202538594,
+                "closed_fees": 44.79342200363611,
+                "modeled_slippage": 5.59920754715191,
+                "same_fill_path_before_fees_pnl": 1.8499668010975157,
+                "same_fill_path_before_modeled_costs_pnl": 7.449174348249426,
+                "average_holding_hours": 4.303030303030303,
+                "fee_share_of_net_loss": 1.0430791326029154
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        },
+        "momentum_baseline": {
+          "closed_trades": 83,
+          "net_pnl": -42.24641775537034,
+          "closed_fees": 69.61868668739174,
+          "modeled_slippage": 8.702371910564308,
+          "same_fill_path_before_fees_pnl": 27.372268932021406,
+          "same_fill_path_before_modeled_costs_pnl": 36.074640842585715,
+          "average_holding_hours": 17.367469879518072,
+          "fee_share_of_net_loss": 1.647919288459478,
+          "total_recorded_fees": 69.61868668739174,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -42.24641775537026,
+          "equity_reconciliation_residual": 7.815970093361102e-14,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 10,
+                "net_pnl": -15.445301262759216,
+                "closed_fees": 10.246023875401647,
+                "modeled_slippage": 1.2807490658967835,
+                "same_fill_path_before_fees_pnl": -5.199277387357569,
+                "same_fill_path_before_modeled_costs_pnl": -3.9185283214607853,
+                "average_holding_hours": 18.65,
+                "fee_share_of_net_loss": 0.6633748154920257
+              },
+              "DOGE/EUR": {
+                "closed_trades": 20,
+                "net_pnl": -7.982643362955934,
+                "closed_fees": 11.566675087916105,
+                "modeled_slippage": 1.4458394158605778,
+                "same_fill_path_before_fees_pnl": 3.5840317249601705,
+                "same_fill_path_before_modeled_costs_pnl": 5.029871140820749,
+                "average_holding_hours": 17.55,
+                "fee_share_of_net_loss": 1.448978059271963
+              },
+              "ETH/EUR": {
+                "closed_trades": 19,
+                "net_pnl": -8.884146512089696,
+                "closed_fees": 21.441886282682752,
+                "modeled_slippage": 2.6802510233259884,
+                "same_fill_path_before_fees_pnl": 12.557739770593056,
+                "same_fill_path_before_modeled_costs_pnl": 15.237990793919044,
+                "average_holding_hours": 19.276315789473685,
+                "fee_share_of_net_loss": 2.4134998509428307
+              },
+              "PEPE/EUR": {
+                "closed_trades": 6,
+                "net_pnl": 0.34367334166811375,
+                "closed_fees": 2.038675739286097,
+                "modeled_slippage": 0.2548371045969294,
+                "same_fill_path_before_fees_pnl": 2.3823490809542105,
+                "same_fill_path_before_modeled_costs_pnl": 2.63718618555114,
+                "average_holding_hours": 16.041666666666668,
+                "fee_share_of_net_loss": null
+              },
+              "SOL/EUR": {
+                "closed_trades": 28,
+                "net_pnl": -10.277999959233602,
+                "closed_fees": 24.325425702105136,
+                "modeled_slippage": 3.0406953008840296,
+                "same_fill_path_before_fees_pnl": 14.047425742871534,
+                "same_fill_path_before_modeled_costs_pnl": 17.088121043755564,
+                "average_holding_hours": 15.767857142857142,
+                "fee_share_of_net_loss": 2.3667470129002615
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 66,
+                "net_pnl": -27.233032164089966,
+                "closed_fees": 55.82973887762444,
+                "modeled_slippage": 6.978752935162303,
+                "same_fill_path_before_fees_pnl": 28.596706713534477,
+                "same_fill_path_before_modeled_costs_pnl": 35.57545964869678,
+                "average_holding_hours": 17.511363636363637,
+                "fee_share_of_net_loss": 2.050074282629559
+              },
+              "2025-09": {
+                "closed_trades": 17,
+                "net_pnl": -15.013385591280366,
+                "closed_fees": 13.788947809767297,
+                "modeled_slippage": 1.723618975402005,
+                "same_fill_path_before_fees_pnl": -1.2244377815130694,
+                "same_fill_path_before_modeled_costs_pnl": 0.49918119388893567,
+                "average_holding_hours": 16.808823529411764,
+                "fee_share_of_net_loss": 0.9184435932809045
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 83,
+                "net_pnl": -42.24641775537034,
+                "closed_fees": 69.61868668739174,
+                "modeled_slippage": 8.702371910564308,
+                "same_fill_path_before_fees_pnl": 27.372268932021406,
+                "same_fill_path_before_modeled_costs_pnl": 36.074640842585715,
+                "average_holding_hours": 17.367469879518072,
+                "fee_share_of_net_loss": 1.647919288459478
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        }
+      },
+      "new_strategy_evaluation": false,
+      "holdout_consumed": false
+    },
+    {
+      "variant": "long",
+      "source": "C:\\Users\\danie\\trading-bot\\research-runs\\intraday-long-20261011\\development-intraday-breakout-20261011T171908632769.json",
+      "source_sha256": "53d67c13673868edc47f2e0853ffab0e546a820a455dcc8e81aa1c94f127d3d0",
+      "scenarios": {
+        "result": {
+          "closed_trades": 53,
+          "net_pnl": -51.25902112186825,
+          "closed_fees": 51.57278798539755,
+          "modeled_slippage": 6.446605258546474,
+          "same_fill_path_before_fees_pnl": 0.3137668635292954,
+          "same_fill_path_before_modeled_costs_pnl": 6.760372122075769,
+          "average_holding_hours": 4.764150943396227,
+          "fee_share_of_net_loss": 1.0061212027983,
+          "total_recorded_fees": 51.57278798539755,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -51.2590211218685,
+          "equity_reconciliation_residual": -2.4868995751603507e-13,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 2,
+                "net_pnl": -2.6598597320278423,
+                "closed_fees": 2.2828616028649664,
+                "modeled_slippage": 0.28535760871758237,
+                "same_fill_path_before_fees_pnl": -0.3769981291628759,
+                "same_fill_path_before_modeled_costs_pnl": -0.09164052044529353,
+                "average_holding_hours": 3.125,
+                "fee_share_of_net_loss": 0.8582639059408379
+              },
+              "DOGE/EUR": {
+                "closed_trades": 15,
+                "net_pnl": -21.64545516079229,
+                "closed_fees": 13.532340285014087,
+                "modeled_slippage": 1.6915361140479206,
+                "same_fill_path_before_fees_pnl": -8.113114875778205,
+                "same_fill_path_before_modeled_costs_pnl": -6.421578761730284,
+                "average_holding_hours": 4.166666666666667,
+                "fee_share_of_net_loss": 0.6251815997626154
+              },
+              "ETH/EUR": {
+                "closed_trades": 12,
+                "net_pnl": -9.531491309584387,
+                "closed_fees": 13.537535724622447,
+                "modeled_slippage": 1.6921976638198037,
+                "same_fill_path_before_fees_pnl": 4.00604441503806,
+                "same_fill_path_before_modeled_costs_pnl": 5.698242078857864,
+                "average_holding_hours": 4.583333333333333,
+                "fee_share_of_net_loss": 1.420295658351992
+              },
+              "PEPE/EUR": {
+                "closed_trades": 4,
+                "net_pnl": -0.13581985075220054,
+                "closed_fees": 1.401965294202838,
+                "modeled_slippage": 0.17524710316789124,
+                "same_fill_path_before_fees_pnl": 1.2661454434506374,
+                "same_fill_path_before_modeled_costs_pnl": 1.4413925466185287,
+                "average_holding_hours": 5.1875,
+                "fee_share_of_net_loss": 10.322241457625246
+              },
+              "SOL/EUR": {
+                "closed_trades": 20,
+                "net_pnl": -17.286395068711528,
+                "closed_fees": 20.818085078693212,
+                "modeled_slippage": 2.602266768793276,
+                "same_fill_path_before_fees_pnl": 3.531690009981684,
+                "same_fill_path_before_modeled_costs_pnl": 6.1339567787749605,
+                "average_holding_hours": 5.4,
+                "fee_share_of_net_loss": 1.2043045988445598
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 21,
+                "net_pnl": -21.096848778883217,
+                "closed_fees": 22.511117280815835,
+                "modeled_slippage": 2.813893888264221,
+                "same_fill_path_before_fees_pnl": 1.414268501932618,
+                "same_fill_path_before_modeled_costs_pnl": 4.2281623901968395,
+                "average_holding_hours": 5.333333333333333,
+                "fee_share_of_net_loss": 1.0670369549858187
+              },
+              "2025-09": {
+                "closed_trades": 9,
+                "net_pnl": -10.53855540543938,
+                "closed_fees": 9.878452793570343,
+                "modeled_slippage": 1.234807173900795,
+                "same_fill_path_before_fees_pnl": -0.6601026118690374,
+                "same_fill_path_before_modeled_costs_pnl": 0.5747045620317577,
+                "average_holding_hours": 3.9166666666666665,
+                "fee_share_of_net_loss": 0.9373630837934076
+              },
+              "2025-10": {
+                "closed_trades": 23,
+                "net_pnl": -19.623616937545656,
+                "closed_fees": 19.183217911011372,
+                "modeled_slippage": 2.3979041963814574,
+                "same_fill_path_before_fees_pnl": -0.4403990265342834,
+                "same_fill_path_before_modeled_costs_pnl": 1.957505169847174,
+                "average_holding_hours": 4.576086956521739,
+                "fee_share_of_net_loss": 0.9775577036620771
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 53,
+                "net_pnl": -51.25902112186825,
+                "closed_fees": 51.57278798539755,
+                "modeled_slippage": 6.446605258546474,
+                "same_fill_path_before_fees_pnl": 0.3137668635292954,
+                "same_fill_path_before_modeled_costs_pnl": 6.760372122075769,
+                "average_holding_hours": 4.764150943396227,
+                "fee_share_of_net_loss": 1.0061212027983
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        },
+        "cost_stress": {
+          "closed_trades": 33,
+          "net_pnl": -42.77969067662128,
+          "closed_fees": 44.81265492189324,
+          "modeled_slippage": 5.601612403543247,
+          "same_fill_path_before_fees_pnl": 2.0329642452719625,
+          "same_fill_path_before_modeled_costs_pnl": 7.63457664881521,
+          "average_holding_hours": 4.303030303030303,
+          "fee_share_of_net_loss": 1.0475217144658542,
+          "total_recorded_fees": 44.81265492189324,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -42.779690676621215,
+          "equity_reconciliation_residual": 6.394884621840902e-14,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 2,
+                "net_pnl": -4.115742180178407,
+                "closed_fees": 2.898809951468187,
+                "modeled_slippage": 0.36234782559591383,
+                "same_fill_path_before_fees_pnl": -1.2169322287102204,
+                "same_fill_path_before_modeled_costs_pnl": -0.8545844031143066,
+                "average_holding_hours": 3.25,
+                "fee_share_of_net_loss": 0.7043225315300315
+              },
+              "DOGE/EUR": {
+                "closed_trades": 9,
+                "net_pnl": -11.711831479352785,
+                "closed_fees": 12.665491933677625,
+                "modeled_slippage": 1.5831966391380643,
+                "same_fill_path_before_fees_pnl": 0.9536604543248401,
+                "same_fill_path_before_modeled_costs_pnl": 2.5368570934629044,
+                "average_holding_hours": 4.111111111111111,
+                "fee_share_of_net_loss": 1.0814270984009702
+              },
+              "ETH/EUR": {
+                "closed_trades": 7,
+                "net_pnl": -11.929909797381642,
+                "closed_fees": 11.434249661309893,
+                "modeled_slippage": 1.4292849421629594,
+                "same_fill_path_before_fees_pnl": -0.4956601360717485,
+                "same_fill_path_before_modeled_costs_pnl": 0.9336248060912109,
+                "average_holding_hours": 4.142857142857143,
+                "fee_share_of_net_loss": 0.958452314854842
+              },
+              "PEPE/EUR": {
+                "closed_trades": 4,
+                "net_pnl": -0.2253652923015548,
+                "closed_fees": 2.06233679330313,
+                "modeled_slippage": 0.2578004782508059,
+                "same_fill_path_before_fees_pnl": 1.8369715010015752,
+                "same_fill_path_before_modeled_costs_pnl": 2.094771979252381,
+                "average_holding_hours": 4.5625,
+                "fee_share_of_net_loss": 9.151084322884895
+              },
+              "SOL/EUR": {
+                "closed_trades": 11,
+                "net_pnl": -14.796841927406893,
+                "closed_fees": 15.751766582134405,
+                "modeled_slippage": 1.9689825183955039,
+                "same_fill_path_before_fees_pnl": 0.9549246547275114,
+                "same_fill_path_before_modeled_costs_pnl": 2.9239071731230153,
+                "average_holding_hours": 4.659090909090909,
+                "fee_share_of_net_loss": 1.064535706971282
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 3,
+                "net_pnl": -3.399615441881906,
+                "closed_fees": 4.769905319187407,
+                "modeled_slippage": 0.5962460310420575,
+                "same_fill_path_before_fees_pnl": 1.3702898773055008,
+                "same_fill_path_before_modeled_costs_pnl": 1.9665359083475584,
+                "average_holding_hours": 5.083333333333333,
+                "fee_share_of_net_loss": 1.403072024095454
+              },
+              "2025-10": {
+                "closed_trades": 6,
+                "net_pnl": -5.9472199894625,
+                "closed_fees": 6.280518869446306,
+                "modeled_slippage": 0.7850693321536374,
+                "same_fill_path_before_fees_pnl": 0.3332988799838059,
+                "same_fill_path_before_modeled_costs_pnl": 1.1183682121374434,
+                "average_holding_hours": 5.166666666666667,
+                "fee_share_of_net_loss": 1.0560428032886553
+              },
+              "2025-11": {
+                "closed_trades": 5,
+                "net_pnl": -3.57695684420147,
+                "closed_fees": 5.882681924698123,
+                "modeled_slippage": 0.7353474048772022,
+                "same_fill_path_before_fees_pnl": 2.305725080496653,
+                "same_fill_path_before_modeled_costs_pnl": 3.0410724853738555,
+                "average_holding_hours": 5.4,
+                "fee_share_of_net_loss": 1.6446052275510161
+              },
+              "2025-12": {
+                "closed_trades": 8,
+                "net_pnl": -12.703091008309197,
+                "closed_fees": 13.188296282567022,
+                "modeled_slippage": 1.6485455703242426,
+                "same_fill_path_before_fees_pnl": 0.4852052742578241,
+                "same_fill_path_before_modeled_costs_pnl": 2.1337508445820665,
+                "average_holding_hours": 3.875,
+                "fee_share_of_net_loss": 1.0381958433534364
+              },
+              "2026-01": {
+                "closed_trades": 1,
+                "net_pnl": -1.5082549884968268,
+                "closed_fees": 1.2375511921013014,
+                "modeled_slippage": 0.15469343497121754,
+                "same_fill_path_before_fees_pnl": -0.27070379639552544,
+                "same_fill_path_before_modeled_costs_pnl": -0.1160103614243079,
+                "average_holding_hours": 2.75,
+                "fee_share_of_net_loss": 0.8205185472880039
+              },
+              "2026-02": {
+                "closed_trades": 3,
+                "net_pnl": -2.3652136229220053,
+                "closed_fees": 3.0926267478005305,
+                "modeled_slippage": 0.38658279945876833,
+                "same_fill_path_before_fees_pnl": 0.7274131248785252,
+                "same_fill_path_before_modeled_costs_pnl": 1.1139959243372934,
+                "average_holding_hours": 4.5,
+                "fee_share_of_net_loss": 1.307546480296301
+              },
+              "2026-03": {
+                "closed_trades": 7,
+                "net_pnl": -13.279338781347375,
+                "closed_fees": 10.361074586092549,
+                "modeled_slippage": 1.2951278307161218,
+                "same_fill_path_before_fees_pnl": -2.9182641952548263,
+                "same_fill_path_before_modeled_costs_pnl": -1.6231363645387045,
+                "average_holding_hours": 3.0714285714285716,
+                "fee_share_of_net_loss": 0.7802402481549817
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 33,
+                "net_pnl": -42.77969067662128,
+                "closed_fees": 44.81265492189324,
+                "modeled_slippage": 5.601612403543247,
+                "same_fill_path_before_fees_pnl": 2.0329642452719625,
+                "same_fill_path_before_modeled_costs_pnl": 7.63457664881521,
+                "average_holding_hours": 4.303030303030303,
+                "fee_share_of_net_loss": 1.0475217144658542
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        },
+        "momentum_baseline": {
+          "closed_trades": 83,
+          "net_pnl": -42.24641775537034,
+          "closed_fees": 69.61868668739174,
+          "modeled_slippage": 8.702371910564308,
+          "same_fill_path_before_fees_pnl": 27.372268932021406,
+          "same_fill_path_before_modeled_costs_pnl": 36.074640842585715,
+          "average_holding_hours": 17.367469879518072,
+          "fee_share_of_net_loss": 1.647919288459478,
+          "total_recorded_fees": 69.61868668739174,
+          "open_marked_pnl": 0.0,
+          "equity_pnl": -42.24641775537026,
+          "equity_reconciliation_residual": 7.815970093361102e-14,
+          "groups": {
+            "symbol": {
+              "BTC/EUR": {
+                "closed_trades": 10,
+                "net_pnl": -15.445301262759216,
+                "closed_fees": 10.246023875401647,
+                "modeled_slippage": 1.2807490658967835,
+                "same_fill_path_before_fees_pnl": -5.199277387357569,
+                "same_fill_path_before_modeled_costs_pnl": -3.9185283214607853,
+                "average_holding_hours": 18.65,
+                "fee_share_of_net_loss": 0.6633748154920257
+              },
+              "DOGE/EUR": {
+                "closed_trades": 20,
+                "net_pnl": -7.982643362955934,
+                "closed_fees": 11.566675087916105,
+                "modeled_slippage": 1.4458394158605778,
+                "same_fill_path_before_fees_pnl": 3.5840317249601705,
+                "same_fill_path_before_modeled_costs_pnl": 5.029871140820749,
+                "average_holding_hours": 17.55,
+                "fee_share_of_net_loss": 1.448978059271963
+              },
+              "ETH/EUR": {
+                "closed_trades": 19,
+                "net_pnl": -8.884146512089696,
+                "closed_fees": 21.441886282682752,
+                "modeled_slippage": 2.6802510233259884,
+                "same_fill_path_before_fees_pnl": 12.557739770593056,
+                "same_fill_path_before_modeled_costs_pnl": 15.237990793919044,
+                "average_holding_hours": 19.276315789473685,
+                "fee_share_of_net_loss": 2.4134998509428307
+              },
+              "PEPE/EUR": {
+                "closed_trades": 6,
+                "net_pnl": 0.34367334166811375,
+                "closed_fees": 2.038675739286097,
+                "modeled_slippage": 0.2548371045969294,
+                "same_fill_path_before_fees_pnl": 2.3823490809542105,
+                "same_fill_path_before_modeled_costs_pnl": 2.63718618555114,
+                "average_holding_hours": 16.041666666666668,
+                "fee_share_of_net_loss": null
+              },
+              "SOL/EUR": {
+                "closed_trades": 28,
+                "net_pnl": -10.277999959233602,
+                "closed_fees": 24.325425702105136,
+                "modeled_slippage": 3.0406953008840296,
+                "same_fill_path_before_fees_pnl": 14.047425742871534,
+                "same_fill_path_before_modeled_costs_pnl": 17.088121043755564,
+                "average_holding_hours": 15.767857142857142,
+                "fee_share_of_net_loss": 2.3667470129002615
+              }
+            },
+            "month": {
+              "2025-08": {
+                "closed_trades": 66,
+                "net_pnl": -27.233032164089966,
+                "closed_fees": 55.82973887762444,
+                "modeled_slippage": 6.978752935162303,
+                "same_fill_path_before_fees_pnl": 28.596706713534477,
+                "same_fill_path_before_modeled_costs_pnl": 35.57545964869678,
+                "average_holding_hours": 17.511363636363637,
+                "fee_share_of_net_loss": 2.050074282629559
+              },
+              "2025-09": {
+                "closed_trades": 17,
+                "net_pnl": -15.013385591280366,
+                "closed_fees": 13.788947809767297,
+                "modeled_slippage": 1.723618975402005,
+                "same_fill_path_before_fees_pnl": -1.2244377815130694,
+                "same_fill_path_before_modeled_costs_pnl": 0.49918119388893567,
+                "average_holding_hours": 16.808823529411764,
+                "fee_share_of_net_loss": 0.9184435932809045
+              }
+            },
+            "exit_reason": {
+              "Unrecorded": {
+                "closed_trades": 83,
+                "net_pnl": -42.24641775537034,
+                "closed_fees": 69.61868668739174,
+                "modeled_slippage": 8.702371910564308,
+                "same_fill_path_before_fees_pnl": 27.372268932021406,
+                "same_fill_path_before_modeled_costs_pnl": 36.074640842585715,
+                "average_holding_hours": 17.367469879518072,
+                "fee_share_of_net_loss": 1.647919288459478
+              }
+            }
+          },
+          "limitations": [
+            "Historical exit reasons were not recorded and are not inferred",
+            "Costs are attributed to identical recorded quantities and fills; removing costs would change trading decisions.",
+            "Historical spread/depth and regime attribution are unavailable unless explicitly recorded."
+          ]
+        }
+      },
+      "new_strategy_evaluation": false,
+      "holdout_consumed": false
+    }
+  ]
+}

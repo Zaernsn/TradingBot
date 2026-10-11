@@ -34,6 +34,12 @@ def get_research_status(db: Session = Depends(get_db), current_user: User = Depe
     return research_status(db,current_user.id)
 
 
+@router.get('/research/execution-costs')
+def get_execution_costs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from app.services.execution_costs import execution_cost_report
+    return execution_cost_report(db,current_user.id)
+
+
 @router.get('/research/forward')
 def get_forward_evidence(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     from app.services.research_service import forward_report

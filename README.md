@@ -26,6 +26,10 @@ Automatic mode evaluates 24 bounded baseline candidates from five fixed strategy
 
 Research status is available at `GET /api/v1/bot/research/status`. Portable non-authoritative evidence can be exported with `GET /api/v1/bot/research/metadata/export` and imported with `POST /api/v1/bot/research/metadata/import`; imports are always `IMPORTED_UNVERIFIED` until locally re-evaluated.
 
+Shadow portfolios now resume independent normal-cost, doubled-cost and benchmark checkpoints, processing only new candle decisions. Changed frozen settings or previously processed data invalidate the evidence. Optional full-replay comparison and measured timing results are documented in [the incremental shadow release](docs/INCREMENTAL_SHADOW_RELEASE_2026_10_11.md).
+
+Automatic research also archives bounded public spread/depth samples. Strategy Lab shows recorded market conditions and available live execution costs, while replay reports explain fee and modeled slippage drag. See [execution-cost evidence and the saved loss diagnosis](docs/EXECUTION_COST_EVIDENCE_RELEASE_2026_10_11.md). Migration `p61011market` adds the public archive; deployment is required before collection begins.
+
 Autonomous multi-asset paper trading and explicit opt-in Kraken spot execution. Paper mode is the default. Strategy profitability has not been established.
 
 ## Local development

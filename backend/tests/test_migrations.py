@@ -55,6 +55,6 @@ def test_upgrade_legacy_startup_with_new_empty_tables(tmp_path,monkeypatch):
     assert 'lock_token' in {c['name'] for c in inspect(engine).get_columns('bot_states')}
     with engine.connect() as conn:
         assert conn.execute(text('SELECT email FROM users WHERE id=1')).scalar()=='preserved@example.com'
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar()=='p61010guards'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar()=='p61011market'
     migrate()  # Restart is idempotent.
     engine.dispose()

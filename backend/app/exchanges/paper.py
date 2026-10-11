@@ -27,6 +27,9 @@ class PaperExchange(ExchangeInterface):
     async def get_ticker(self, symbol: str) -> Ticker:
         return await self.market.get_ticker(symbol)
 
+    async def get_order_book(self, symbol: str):
+        return await self.market.get_order_book(symbol)
+
     async def get_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 100) -> List[OHLCV]:
         return await self.market.get_ohlcv(symbol, timeframe=timeframe, limit=limit)
 

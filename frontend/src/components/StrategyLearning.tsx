@@ -76,6 +76,7 @@ function StrategyLearning({ research }: { research: ResearchStatus | null }) {
           <span>Final-test drawdown <strong>{percent(candidate.holdout?.max_drawdown_pct)}</strong></span>
           <span>Paper evidence <strong>{candidate.shadow_days.toFixed(1)} days observed · {candidate.shadow_closed_trades}/{candidate.shadow_trades_required} trades · no minimum days</strong></span>
         </div>
+          {candidate.cost_attribution && <p>Closed-trade net P&amp;L €{candidate.cost_attribution.net_pnl.toFixed(2)} · fees €{candidate.cost_attribution.closed_fees.toFixed(2)} · modeled slippage {candidate.cost_attribution.modeled_slippage == null ? 'unavailable' : `€${candidate.cost_attribution.modeled_slippage.toFixed(2)}`}. Cost attribution uses the same recorded fills; it is not a zero-cost strategy test.</p>}
           {candidate.failed_checks.length > 0 && <ul>{candidate.failed_checks.map(reason => <li key={reason}>{reasons[reason] ?? reason.replace(/_/g,' ')}</li>)}</ul>}
           {candidate.stopped_stage && <p>Stopped early at {candidate.stopped_stage.replace(/_/g, ' ')}; later test stages were skipped.</p>}
           {!!candidate.validation_windows?.length && <p>Validation windows passed: {candidate.validation_windows.filter(window => window.passed).length}/{candidate.validation_windows.length} evaluated.</p>}

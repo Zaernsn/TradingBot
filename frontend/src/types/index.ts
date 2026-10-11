@@ -119,6 +119,7 @@ export interface ResearchCandidate {
   failed_checks: string[];
   promotion_reason?: string | null;
   shadow_rejection?: string | null;
+  cost_attribution?: CostAttribution | null;
   research_revisions?: number;
   holdout?: { total_return_pct?: number | null; expectancy?: number | null; max_drawdown_pct?: number | null } | null;
   stress?: { total_return_pct?: number | null } | null;
@@ -134,6 +135,25 @@ export interface ResearchStatus {
   verified_taker_fee_pct?: number | null;
   verified_taker_fee_at?: string | null;
   watchlist_age_seconds?: number | null;
+}
+
+export interface CostAttribution {
+  net_pnl: number;
+  closed_fees: number;
+  modeled_slippage: number | null;
+  same_fill_path_before_modeled_costs_pnl: number | null;
+  closed_trades: number;
+}
+
+export interface ExecutionCostsReport {
+  public_markets: {
+    observations: number;
+    median_valid_spread_pct: number | null;
+    latest: Record<string, { status: string; received_at: string; age_seconds: number;
+      spread_pct: number | null; bid_depth_eur: number | null; ask_depth_eur: number | null }>;
+  };
+  live_execution: { filled_orders: number; fresh_quote_matched_orders: number;
+    quote_fee_eur: number | null; adverse_vs_touch_eur: number | null };
 }
 
 export interface RiskConfig {
