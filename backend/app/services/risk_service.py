@@ -131,7 +131,7 @@ def risk_manager_from_config(config: RiskConfig) -> RiskManager:
     )
 
 
-def entry_budget(portfolio, risk, symbol, positions, history):
+def entry_budget(portfolio, risk, symbol, positions, history,timeframe='1h'):
     """Cap total and positively correlated exposure; missing histories are conservative."""
     import pandas as pd
     equity=max(0.,portfolio.equity)
@@ -141,11 +141,14 @@ def entry_budget(portfolio, risk, symbol, positions, history):
     risk_per_trade_pct = getattr(risk, 'risk_per_trade_pct', 0.0)
     prediction_horizon = getattr(risk, 'prediction_horizon', 12)
     stop_loss_pct = getattr(risk, 'stop_loss_pct', 0.0)
+    if timeframe not in {'1h','15m'}:
+        raise ValueError('Unsupported risk history timeframe')
+    correlation_bars=168*(4 if timeframe=='15m' else 1)
     fee_pct = getattr(risk, 'fee_pct', 0.0)
     slippage_pct = getattr(risk, 'slippage_pct', 0.0)
 
     def returns(candles):
-        return pd.Series({c.timestamp:c.close for c in candles}).sort_index().pct_change().dropna().tail(168)
+        return pd.Series({c.timestamp:c.close for c in candles}).sort_index().pct_change().dropna().tail(correlation_bars)
     candidate=returns(history.get(symbol,[]))
     for position in positions:
         other=returns(history.get(position.symbol,[]))

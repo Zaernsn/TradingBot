@@ -15,7 +15,7 @@ from app.services.portfolio_service import get_or_create_portfolio, recalculate_
 from app.services.trading_service import execute_paper_trade
 from app.services.risk_service import get_risk_config, risk_manager_from_config, entry_budget, check_drawdown
 from app.services.asset_selector import AssetSelector
-from app.services.market_data import load_history, utc
+from app.services.market_data import load_history, utc, INTERVALS
 from app.services import execution_lease as lease
 from app.services.live_execution import live_exchange, assert_live_enabled, reconcile_all, unresolved, verify_balances, execute_live, TERMINAL
 from app.ml.models import SignalModel, apply_buy_threshold
@@ -23,15 +23,15 @@ from app.ml.strategies import (
     MomentumModel, FastMomentumModel, AdaptiveMomentumModel,
     AdaptiveParameters, MarketRegime, classify_market_regime, rank_entries,
 )
-from app.ml.strategy_factory import definition_from_parameters, candidate_factory
+from app.ml.strategy_factory import definition_from_parameters, candidate_factory, candidate_timeframe, candidate_warmup, candidate_risk
 from app.services.model_recovery import ModelTrainer
 from app.services.momentum_policy import depth_capacity
 from app.services.preflight_errors import (
     preflight_error, retryable_preflight_error, retry_delay_seconds,
 )
 
-CANARY_MAX_POSITIONS = 2
-CANARY_MAX_EXPOSURE_PCT = .25
+CANARY_MAX_POSITIONS = 1
+CANARY_MAX_EXPOSURE_PCT = .05
 
 
 def canary_entry_budget(portfolio, positions, normal_budget):
@@ -122,7 +122,8 @@ class BotOrchestrator:
         start_market_stream()
         if not self.scheduler.running: self.scheduler.start()
         self.scheduler.add_job(self.sweep,IntervalTrigger(seconds=30),id='restore_bots',replace_existing=True,max_instances=1)
-        self.scheduler.add_job(self.research_strategies,IntervalTrigger(hours=1),id='strategy_research',
+        from app.services.strategy_research import RESEARCH_INTERVAL_MINUTES
+        self.scheduler.add_job(self.research_strategies,IntervalTrigger(minutes=RESEARCH_INTERVAL_MINUTES),id='strategy_research',
             replace_existing=True,max_instances=1,next_run_time=datetime.now(timezone.utc)+timedelta(minutes=5))
         await self.sweep()
 
@@ -130,23 +131,39 @@ class BotOrchestrator:
         from app.db.session import SessionLocal
         with SessionLocal() as db:
             users=[row[0] for row in db.query(RiskConfig.user_id).filter(RiskConfig.entry_strategy=='auto').all()]
+            symbols={symbol for state in db.query(BotState).filter(BotState.user_id.in_(users)).all()
+                     for symbol in (state.watchlist or [])}
+        collection=None
+        if users:
+            from app.services.research_market_data import collect_intraday_history
+            public_exchange=PaperExchange()  # No account credentials or live order methods.
+            try:
+                with SessionLocal() as db:
+                    collection=await collect_intraday_history(db,public_exchange,symbols or CURATED_PAIRS)
+            except Exception as exc:
+                collection={'timeframe':'15m','errors':{'collection':type(exc).__name__}}
+            finally:
+                with contextlib.suppress(Exception): await public_exchange.close()
         def evaluate(user_id):
-            from app.services.strategy_research import research_next_candidate, advance_shadow_candidates, review_live_canary
+            from app.services.strategy_research import research_next_candidate, advance_shadow_candidates, review_live_canary, RESEARCH_BATCH_SIZE, research_snapshots
             with SessionLocal() as db:
                 generated=[]
-                # Bounded batches keep research from monopolizing the live loop;
-                # all twelve candidates finish within four hourly runs.
-                for _ in range(3):
-                    row=research_next_candidate(db,user_id)
+                snapshots=research_snapshots(db)
+                benchmark_cache={}
+                # Research stays in the background with bounded, non-overlapping
+                # batches. Forward evidence still requires new completed candles.
+                for _ in range(RESEARCH_BATCH_SIZE):
+                    row=research_next_candidate(db,user_id,timeframe_snapshots=snapshots,benchmark_cache=benchmark_cache)
                     if row is None: break
                     generated.append({'candidate_id':row.candidate_id,'decision':row.status})
-                shadow=advance_shadow_candidates(db,user_id)
+                shadow=advance_shadow_candidates(db,user_id,timeframe_snapshots=snapshots,benchmark_cache=benchmark_cache)
                 canary=review_live_canary(db,user_id)
                 return {'generated':generated,'shadow':shadow,'canary':canary}
         for user_id in users:
             try:
                 result=await asyncio.to_thread(evaluate,user_id)
-                research={'status':'evaluated' if result['generated'] or result['shadow'] or result['canary'] else 'waiting',**result}
+                research={'status':'evaluated' if result['generated'] or result['shadow'] or result['canary'] else 'waiting',**result,
+                          'intraday_collection':collection}
             except Exception as exc:
                 research={'status':'error','message':str(exc)[:300]}
             with SessionLocal() as db:
@@ -478,31 +495,35 @@ class BotOrchestrator:
             # Auto mode needs a point-in-time basket view before evaluating any
             # member. Preloading also keeps strategy choice independent of loop order.
             if risk.entry_strategy=='auto':
+                from app.services.strategy_research import approved_candidate
+                active_candidate=approved_candidate(db,user_id,portfolio.book_type)
+                auto_definition=(definition_from_parameters(active_candidate.parameters)
+                                 if active_candidate else None)
+                signal_timeframe=candidate_timeframe(auto_definition)
                 for symbol in symbols:
                     if symbol in histories or symbol not in quotes or symbol in exited:
                         continue
                     try:
                         histories[symbol]=await self._await_with_protection(
-                            asyncio.wait_for(load_history(db,exchange,symbol),timeout=20),protect)
+                            asyncio.wait_for(load_history(db,exchange,symbol,timeframe=signal_timeframe,
+                                refresh_if_needed=signal_timeframe=='15m'),timeout=20),protect)
                     except Exception as exc:
                         errors.append(f'{symbol} history: {exc}')
                 round_trip=(1+risk.fee_pct)*(1+risk.slippage_pct)/((1-risk.fee_pct)*(1-risk.slippage_pct))-1
-                from app.services.strategy_research import approved_candidate
-                active_candidate=approved_candidate(db,user_id,portfolio.book_type)
-                auto_definition=(definition_from_parameters(active_candidate.parameters)
-                                 if active_candidate else None)
                 regime_parameters=(auto_definition if isinstance(auto_definition,AdaptiveParameters)
                                    else AdaptiveParameters())
-                auto_regime=(classify_market_regime(histories,watchlist,round_trip,regime_parameters)
+                auto_regime=(classify_market_regime(histories,watchlist,round_trip,regime_parameters,timeframe=signal_timeframe)
                              if auto_definition else MarketRegime('insufficient',0.,0.,0.,0,3))
             else:
                 auto_regime=auto_definition=active_candidate=None
+                signal_timeframe='1h'
             for symbol in symbols:
                 if symbol not in quotes: continue
                 try:
                     candles=histories.get(symbol)
                     if candles is None:
-                        candles=await self._await_with_protection(asyncio.wait_for(load_history(db,exchange,symbol),timeout=20),protect)
+                        candles=await self._await_with_protection(asyncio.wait_for(load_history(db,exchange,symbol,
+                            timeframe=signal_timeframe,refresh_if_needed=signal_timeframe=='15m'),timeout=20),protect)
                     histories[symbol]=candles
                     if not candles or symbol in exited:
                         explain(symbol,'history_or_exit','Waiting for usable history or the next cycle after an exit.')
@@ -517,12 +538,13 @@ class BotOrchestrator:
                         classes={'momentum':MomentumModel,'fast_momentum':FastMomentumModel,'auto':AdaptiveMomentumModel}
                         names={'momentum':'momentum-v1','fast_momentum':'fast-momentum-v1','auto':'adaptive-momentum-v1'}
                         name=names[risk.entry_strategy]
+                        if signal_timeframe!='1h': name+='-'+signal_timeframe
                         model=(candidate_factory(auto_definition)(symbol) if risk.entry_strategy=='auto' and auto_definition
                                else AdaptiveMomentumModel(parameters=None) if risk.entry_strategy=='auto'
                                else classes[risk.entry_strategy]())
                         if risk.entry_strategy=='auto': model.set_regime(auto_regime)
                         model.name = name
-                        if latest and latest.model == name and (latest.features or {}).get('candle_timestamp') == stamp:
+                        if risk.entry_strategy!='auto' and latest and latest.model == name and (latest.features or {}).get('candle_timestamp') == stamp:
                             prediction = None
                         else:
                             model.fit(candles, fee_pct=risk.fee_pct, slippage_pct=risk.slippage_pct)
@@ -536,8 +558,28 @@ class BotOrchestrator:
                                 diagnostics={'strategy':risk.entry_strategy,
                                              'active_strategy':prediction.get('active_strategy',risk.entry_strategy),
                                              'regime':prediction.get('regime'), 'probability_available':False,
-                                             'history_rows':len(candles), 'latest_candle':stamp},
+                                             'history_rows':len(candles), 'latest_candle':stamp,
+                                             'candidate_id':active_candidate.candidate_id if active_candidate else None,
+                                             'signal_timeframe':signal_timeframe},
                                 explanation=explanation+' Rule-based signal; no probability estimate. Final execution checks apply.')
+                            if risk.entry_strategy=='auto' and latest and latest.model==name and (latest.features or {}).get('candle_timestamp')==stamp:
+                                previous=(state.entry_decisions or {}).get(symbol,{})
+                                retry_after=previous.get('retry_after')
+                                if previous.get('retryable') and previous.get('retry_signal_id')==latest.id and retry_after:
+                                    try:
+                                        if utc(datetime.fromisoformat(retry_after))>datetime.now(timezone.utc):
+                                            prediction=None
+                                    except (TypeError,ValueError):
+                                        prediction=None
+                                if prediction is not None and latest.action==prediction['action'] and (latest.features or {}).get('diagnostics',{}).get('candidate_id')==prediction['diagnostics']['candidate_id']:
+                                    # Recheck unchanged evidence and current execution conditions
+                                    # without creating a signal row on every 30-second cycle.
+                                    reused_signal=True
+                                    prediction.update(_signal_id=latest.id,_candle_timestamp=stamp,_signal_timeframe=signal_timeframe)
+                                    predictions[symbol]=prediction
+                                    explain(symbol,'rechecking_signal','Rechecking the current automatic signal and execution conditions.')
+                                    decisions[symbol].update(signal=latest.action,signal_id=latest.id,
+                                        diagnostics=prediction['diagnostics'],model_status='ready')
                     elif model is None or model.name!=name:
                         model=SignalModel(name=name)
                         if hasattr(model,'load_active'): model.load_active()
@@ -577,7 +619,7 @@ class BotOrchestrator:
                         else:
                             explain(symbol,'retry_wait' if retryable else 'waiting_candle',
                                 ('A safe pre-submission retry is waiting for its backoff period.' if retryable else
-                                 'Waiting for the next completed hourly candle. '+(latest.explanation or '')))
+                                 f'Waiting for the next completed {signal_timeframe} candle. '+(latest.explanation or '')))
                             decisions[symbol].update(diagnostics=(latest.features or {}).get('diagnostics',{}),
                                 model_status=(latest.features or {}).get('model_status','unknown'),
                                 signal=latest.action,signal_id=latest.id)
@@ -589,11 +631,11 @@ class BotOrchestrator:
                     if not reused_signal:
                         signal=Signal(portfolio_id=portfolio.id,symbol=symbol,model=model.name,action=prediction['action'],
                                       probability=prediction['probability'],confidence=prediction['confidence'],
-                                      features={**(prediction.get('features') or {}),'candle_timestamp':stamp,
+                                      features={**(prediction.get('features') or {}),'candle_timestamp':stamp,'signal_timeframe':signal_timeframe,
                                                 'model_status':prediction.get('status','ready'), 'diagnostics':prediction.get('diagnostics',{})},
                                       explanation=prediction.get('explanation'))
                         db.add(signal); db.commit()
-                        prediction.update(_signal_id=signal.id,_candle_timestamp=stamp)
+                        prediction.update(_signal_id=signal.id,_candle_timestamp=stamp,_signal_timeframe=signal_timeframe)
                         predictions[symbol]=prediction
                         explain(symbol,prediction.get('status','signal'),prediction.get('explanation') or f'Model signal is {prediction["action"]}; no buy entry requested.')
                         decisions[symbol].update(diagnostics=prediction.get('diagnostics',{}),model_status=prediction.get('status','ready'),
@@ -601,8 +643,11 @@ class BotOrchestrator:
                         statuses=dict(state.candidate_status or {})
                         statuses[symbol]={**statuses.get(symbol,{}),'model_ready':prediction.get('entry_qualified',False),
                             'model_candle':stamp,'history_rows':len(candles),
-                            'history_eligible':len(candles)>=(30 if risk.entry_strategy in {'momentum','fast_momentum','auto'} else 336)}
+                            'signal_timeframe':signal_timeframe,
+                            'history_eligible':len(candles)>=(candidate_warmup(auto_definition) if auto_definition else
+                                30 if risk.entry_strategy in {'momentum','fast_momentum','auto'} else 336)}
                         state.candidate_status=statuses
+                        db.commit()  # Subsequent lease checks refresh state from the database.
                 except Exception as exc:
                     db.rollback(); errors.append(f'{symbol} model: {exc}')
                     explain(symbol,'history_unavailable','History or model evaluation unavailable. '+str(exc))
@@ -619,7 +664,9 @@ class BotOrchestrator:
                 decision=decisions.get(symbol,{})
                 if decision.get('model_status')=='ready' and symbol not in exited and not get_position(db,portfolio.id,symbol):
                     positions=db.query(Position).filter(Position.portfolio_id==portfolio.id,Position.quantity>0).all()
-                    readiness=await self._await_with_protection(entry_readiness(exchange,portfolio,risk,symbol,positions,histories),protect)
+                    readiness=await self._await_with_protection(entry_readiness(exchange,portfolio,
+                        candidate_risk(risk,auto_definition),symbol,positions,histories,
+                        timeframe=signal_timeframe,minimum_history=candidate_warmup(auto_definition) if auto_definition else None),protect)
                     decision['eligibility']=readiness
                     # Preflight explains HOLD/SELL readiness without changing its signal.
                     if not readiness['eligible']:
@@ -640,7 +687,17 @@ class BotOrchestrator:
                 if symbol in exited:
                     explain(symbol,'just_exited','Position just exited; no re-entry in the same cycle.'); continue
                 prediction = predictions.get(symbol, {})
-                execution_risk=risk
+                if not prediction:
+                    # Preserve the evaluation's wait/error/backoff explanation.
+                    # Ranking may include watched assets with no actionable signal.
+                    continue
+                if risk.entry_strategy=='auto' and prediction.get('_candle_timestamp'):
+                    last_exit=db.query(Trade).filter(Trade.portfolio_id==portfolio.id,Trade.symbol==symbol,
+                        Trade.side=='SELL').order_by(Trade.created_at.desc()).first()
+                    evidence_end=utc(datetime.fromisoformat(prediction['_candle_timestamp']))+INTERVALS[signal_timeframe]
+                    if last_exit and utc(last_exit.created_at)>=evidence_end:
+                        explain(symbol,'waiting_new_evidence','Waiting for new completed market evidence after the last exit.'); continue
+                execution_risk=candidate_risk(risk,auto_definition)
                 action = str(prediction.get('action', 'HOLD')).upper()
                 if action == 'SELL':
                     explain(symbol,'signal_sell','Signal remains negative; moving to the next candidate.'); continue
@@ -674,7 +731,7 @@ class BotOrchestrator:
                     if not isinstance(exc, LiquidityLimitError):
                         errors.append(f'{symbol}: '+(str(exc) if isinstance(exc,ValueError) else preflight_error(exc)))
                     continue
-                budget=entry_budget(portfolio,risk,symbol,positions,histories)
+                budget=entry_budget(portfolio,execution_risk,symbol,positions,histories,timeframe=signal_timeframe)
                 if canary:
                     # Canary exposure is portfolio-wide. Existing user/global
                     # limits remain in force when they are stricter.
@@ -699,7 +756,7 @@ class BotOrchestrator:
                         continue
                     taker=fee.get('taker')
                     try:
-                        execution_risk=with_verified_taker_fee(risk,taker)
+                        execution_risk=with_verified_taker_fee(execution_risk,taker)
                     except ValueError:
                         errors.append(f'{symbol}: Kraken returned no usable taker fee')
                         explain(symbol,'fee_check','Kraken returned no usable taker fee; no order was submitted.')

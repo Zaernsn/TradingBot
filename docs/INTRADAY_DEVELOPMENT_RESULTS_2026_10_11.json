@@ -1,0 +1,81 @@
+{
+  "study": "completed-15-minute development",
+  "code_id": "edb8a5707ea2aed5861ca14429fca1c9722ce89a413334bfc2cba83052152173",
+  "variants": [
+    {
+      "variant": "short",
+      "parameters": {
+        "family": "intraday_breakout",
+        "lookback": 12,
+        "threshold": 0.0075,
+        "timeframe": "15m",
+        "volume_ratio": 1.25,
+        "z_entry": 0.0
+      },
+      "artifact": "C:\\Users\\danie\\trading-bot\\research-runs\\intraday-short-20261011\\development-intraday-breakout-20261011T171905702255.json",
+      "protocol_id": "7b5f11624428c5c456bc4956d6992f32cc7511a06a774a07bc96eaadfb0fcd18",
+      "return_pct": -0.09913612017517603,
+      "stress_return_pct": -0.09879968202450207,
+      "expectancy": -1.1265468201724547,
+      "stress_expectancy": -1.4114240289214608,
+      "max_drawdown_pct": -0.10172544239455739,
+      "closed_trades": 44,
+      "fees": 43.534973484644766,
+      "profit_factor": 0.10924093549636982,
+      "momentum_return_pct": -0.0844928355107405,
+      "development_passed": false,
+      "holdout_consumed": false,
+      "live_authorized": false
+    },
+    {
+      "variant": "medium",
+      "parameters": {
+        "family": "intraday_breakout",
+        "lookback": 24,
+        "threshold": 0.01,
+        "timeframe": "15m",
+        "volume_ratio": 1.5,
+        "z_entry": 0.0
+      },
+      "artifact": "C:\\Users\\danie\\trading-bot\\research-runs\\intraday-medium-20261011\\development-intraday-breakout-20261011T171908492608.json",
+      "protocol_id": "6284e1b9e4a90f763e3a3adac97532b73a2de496c3eadfd56e7f448f3b18c6f6",
+      "return_pct": -0.09996406411024472,
+      "stress_return_pct": -0.08588691040507712,
+      "expectancy": -0.9087642191840432,
+      "stress_expectancy": -1.3013168243193514,
+      "max_drawdown_pct": -0.10223436944482933,
+      "closed_trades": 55,
+      "fees": 50.33144535988308,
+      "profit_factor": 0.16844178737005586,
+      "momentum_return_pct": -0.0844928355107405,
+      "development_passed": false,
+      "holdout_consumed": false,
+      "live_authorized": false
+    },
+    {
+      "variant": "long",
+      "parameters": {
+        "family": "intraday_breakout",
+        "lookback": 48,
+        "threshold": 0.015,
+        "timeframe": "15m",
+        "volume_ratio": 2.0,
+        "z_entry": 0.0
+      },
+      "artifact": "C:\\Users\\danie\\trading-bot\\research-runs\\intraday-long-20261011\\development-intraday-breakout-20261011T171908632769.json",
+      "protocol_id": "50353d9c7bb7bdd5724d0671befd6feb65669f27a6ffb3cb8f302bfe3780ed33",
+      "return_pct": -0.10251804224373695,
+      "stress_return_pct": -0.08555938135324248,
+      "expectancy": -0.9671513419220423,
+      "stress_expectancy": -1.2963542629279174,
+      "max_drawdown_pct": -0.10478190526868736,
+      "closed_trades": 53,
+      "fees": 51.57278798539754,
+      "profit_factor": 0.16528414171091824,
+      "momentum_return_pct": -0.0844928355107405,
+      "development_passed": false,
+      "holdout_consumed": false,
+      "live_authorized": false
+    }
+  ]
+}

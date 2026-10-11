@@ -24,7 +24,7 @@ def main():
     try:
         if args.command=='register':
             register(args.manifest,args.protocol,args.output); print(f'Registered: {args.output}')
-        elif args.command=='run': print(run_experiment(args.directory,args.stage,args.candidate))
+        elif args.command=='run': print(run_experiment(args.directory,args.stage,args.candidate,progress=lambda message:print(message,flush=True)))
         elif args.command=='freeze': freeze(args.directory,args.candidate); print('Candidate frozen; holdout can be consumed once')
         elif args.command=='forward':
             from app.db.session import SessionLocal

@@ -1,8 +1,8 @@
 """Constrained strategy generation and promotion; never executes an order."""
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from app.ml.strategies import (
     AdaptiveParameters, AdaptiveMomentumModel, VolatilityTrendModel,
-    BreakoutLiquidityModel, DefensiveMeanReversionModel,
+    BreakoutLiquidityModel, DefensiveMeanReversionModel, IntradayBreakoutModel,
 )
 
 
@@ -13,9 +13,14 @@ class StrategyDefinition:
     threshold: float = 0.
     volume_ratio: float = 0.
     z_entry: float = 0.
+    timeframe: str = '1h'
 
     def __post_init__(self):
-        if self.family not in {'volatility_trend','breakout_liquidity','defensive_mean_reversion'}:
+        if self.family=='intraday_breakout':
+            if self.timeframe!='15m' or not 8<=self.lookback<=96 or not .005<=self.threshold<=.10 or not 1.05<=self.volume_ratio<=3.:
+                raise ValueError('Intraday parameters require bounded 15-minute configuration')
+            return
+        if self.family not in {'volatility_trend','breakout_liquidity','defensive_mean_reversion'} or self.timeframe!='1h':
             raise ValueError('Unknown generated strategy family')
         if not 24<=self.lookback<=168:
             raise ValueError('Generated strategy lookback is outside bounds')
@@ -49,23 +54,31 @@ def generated_candidates():
         StrategyDefinition('defensive_mean_reversion',48,z_entry=-2.),
         StrategyDefinition('defensive_mean_reversion',72,z_entry=-2.5),
     ]
-    return adaptive+families
+    intraday=[StrategyDefinition('intraday_breakout',lookback,threshold=threshold,volume_ratio=volume,timeframe='15m')
+              for lookback,threshold,volume in ((12,.0075,1.25),(24,.01,1.5),(48,.015,2.))]
+    return intraday+adaptive+families
 
 
-def derived_candidates(evaluated):
+def derived_candidates(evaluated, successive=False):
     """Create a tiny second generation inside the declared safe grammar.
 
     The bot may tune parameters, but it cannot author executable code, expand
     risk limits, or create an unbounded multiple-testing loop.
     """
     base=generated_candidates(); base_ids={candidate_id(value) for value in base}
-    rows=[row for row in evaluated if row.candidate_id in base_ids]
+    rows=list(evaluated) if successive else [row for row in evaluated if row.candidate_id in base_ids]
+    # Freeze the parent pool before generating children. Final-test outcomes
+    # must never influence mutations, including after a parent is refreshed.
+    if not successive and {row.candidate_id for row in rows} != base_ids:
+        return []
     def family(row): return row.parameters.get('family','adaptive_momentum')
     def score(row):
-        holdout=(row.metrics or {}).get('holdout',{})
-        return (float(holdout.get('expectancy') or 0.),float(holdout.get('total_return_pct') or 0.))
+        metrics=row.metrics or {}
+        development=metrics.get('generation_development',metrics.get('development',{}))
+        return (float(development.get('expectancy') or 0.),
+                float(development.get('total_return_pct') or 0.),row.candidate_id)
     children=[]
-    for name in ('adaptive_momentum','volatility_trend','breakout_liquidity','defensive_mean_reversion'):
+    for name in ('adaptive_momentum','volatility_trend','breakout_liquidity','defensive_mean_reversion','intraday_breakout'):
         matches=[row for row in rows if family(row)==name]
         if not matches: continue
         parent=definition_from_parameters(max(matches,key=score).parameters)
@@ -80,11 +93,15 @@ def derived_candidates(evaluated):
         elif name=='breakout_liquidity':
             children.extend([StrategyDefinition(name,max(24,parent.lookback-12),volume_ratio=max(1.05,parent.volume_ratio-.15)),
                              StrategyDefinition(name,min(168,parent.lookback+12),volume_ratio=min(3.,parent.volume_ratio+.15))])
-        else:
+        elif name=='defensive_mean_reversion':
             children.extend([StrategyDefinition(name,max(24,parent.lookback-12),z_entry=max(-4.,parent.z_entry-.25)),
                              StrategyDefinition(name,min(168,parent.lookback+12),z_entry=min(-1.,parent.z_entry+.25))])
+        else:
+            children.extend([replace(parent,lookback=max(8,parent.lookback-4),threshold=max(.005,parent.threshold*.85)),
+                             replace(parent,lookback=min(96,parent.lookback+4),threshold=min(.10,parent.threshold*1.15))])
     unique=[]; seen=base_ids
-    for child in children:
+    # Reserve a first variation for each family before spending remaining slots.
+    for child in children[::2]+children[1::2]:
         identity=candidate_id(child)
         if identity not in seen: unique.append(child); seen.add(identity)
     return unique[:8]
@@ -93,7 +110,23 @@ def derived_candidates(evaluated):
 def candidate_parameters(parameters):
     # Keep the original adaptive representation stable. Existing databases and
     # exported metadata used this shape before multiple families were added.
-    return asdict(parameters) if isinstance(parameters,AdaptiveParameters) else asdict(parameters)
+    values=asdict(parameters)
+    if values.get('timeframe')=='1h':
+        values.pop('timeframe')  # Preserve existing hourly identities and exports.
+    return values
+
+
+def candidate_timeframe(parameters):
+    return getattr(parameters,'timeframe','1h')
+
+
+def candidate_warmup(parameters):
+    return max(97,parameters.lookback+1) if candidate_timeframe(parameters)=='15m' else 30
+
+
+def candidate_risk(risk,parameters):
+    # A saved hourly volatility-sizing horizon keeps its duration at four bars/hour.
+    return replace(risk,prediction_horizon=risk.prediction_horizon*4) if candidate_timeframe(parameters)=='15m' else risk
 
 
 def candidate_id(parameters):
@@ -107,6 +140,8 @@ def candidate_id(parameters):
 def candidate_factory(parameters):
     if isinstance(parameters,AdaptiveParameters):
         return lambda _: AdaptiveMomentumModel(parameters=parameters)
+    if parameters.family=='intraday_breakout':
+        return lambda _: IntradayBreakoutModel(lookback=parameters.lookback,threshold=parameters.threshold,volume_ratio=parameters.volume_ratio)
     if parameters.family=='volatility_trend':
         return lambda _: VolatilityTrendModel(lookback=parameters.lookback,threshold=parameters.threshold)
     if parameters.family=='breakout_liquidity':
@@ -140,6 +175,7 @@ def promotion_decision(development, validation, stress, benchmark, holdout=None)
             'development_expectancy_positive':development['expectancy']>0,
             'validation_expectancy_positive':validation['expectancy']>0,
             'holdout_expectancy_positive':holdout['expectancy']>0,
+            'holdout_beats_cash':holdout['total_return_pct']>0,
             'holdout_beats_momentum':holdout['total_return_pct']>benchmark['total_return_pct'],
             'stress_positive':stress['expectancy']>0 and stress['total_return_pct']>0,
             'drawdown_within_8pct':holdout['max_drawdown_pct']>=-.08,
@@ -150,10 +186,12 @@ def promotion_decision(development, validation, stress, benchmark, holdout=None)
 
 
 def shadow_promotion_decision(shadow, stress, benchmark, observed_days,
-                              min_days=7, max_days=30, min_closed_trades=30):
+                              min_days=0, max_days=30, min_closed_trades=30):
     """Promote only frozen, genuinely forward shadow evidence.
 
-    The candidate remains active while evidence is immature.  After the maximum
+    No calendar minimum applies by default: completed forward trades and net
+    performance qualify a small live pilot, not proof of a profitable strategy.
+    The candidate remains active while evidence is immature. After the maximum
     observation window, a candidate that still misses a gate is rejected so a
     weak strategy cannot wait indefinitely for one lucky period.
     """
@@ -167,7 +205,8 @@ def shadow_promotion_decision(shadow, stress, benchmark, observed_days,
                                 float(benchmark.get('total_return_pct') or 0.),
         'stress_positive':float(stress.get('expectancy') or 0.)>0 and
                           float(stress.get('total_return_pct') or 0.)>0,
-        'drawdown_within_5pct':float(shadow.get('max_drawdown_pct') or -1.)>=-.05,
+        'drawdown_within_5pct':float(shadow.get('max_drawdown_pct',-1.))>=-.05,
+        'shadow_profit_concentration_within_80pct':0<=float(shadow.get('top_five_profit_share',1.))<=.80,
         'risk_not_halted':shadow.get('risk_halted') is not True,
     }
     passed=all(checks.values())

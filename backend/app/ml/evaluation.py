@@ -29,7 +29,7 @@ def mean_interval(values, block_size=24, samples=1000, seed=17):
             'samples': samples, 'seed': seed}
 
 
-def curve_metrics(curve):
+def curve_metrics(curve,periods_per_year=365*24,block_size=24):
     values = np.asarray(curve, dtype=float)
     peaks = np.maximum.accumulate(values)
     drawdowns = values / peaks - 1
@@ -39,8 +39,8 @@ def curve_metrics(curve):
         longest = max(longest, current)
     returns = np.diff(values) / values[:-1]
     return {'max_drawdown_pct': float(drawdowns.min()), 'time_underwater_bars': longest,
-            'hourly_mean_return_interval': mean_interval(returns),
-            'sharpe_ratio': float(returns.mean() / returns.std(ddof=1) * math.sqrt(365 * 24))
+            'hourly_mean_return_interval': mean_interval(returns,block_size=block_size),
+            'sharpe_ratio': float(returns.mean() / returns.std(ddof=1) * math.sqrt(periods_per_year))
             if len(returns) > 1 and returns.std(ddof=1) > 1e-12 else 0.}
 
 
@@ -64,7 +64,7 @@ def promotion_report(historical, forward, policy=None):
     policy = policy or PromotionPolicy()
     reasons = []
     def positive_interval(report):
-        interval = report.get('hourly_mean_return_interval') or {}
+        interval = report.get('bar_mean_return_interval') or report.get('hourly_mean_return_interval') or {}
         lower = interval.get('low')
         return isinstance(lower, (float, int)) and math.isfinite(lower) and lower > 0
 

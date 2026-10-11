@@ -9,15 +9,15 @@ from app.services.momentum_policy import depth_capacity
 from app.exchanges.universe import is_memecoin
 
 
-async def entry_readiness(exchange, portfolio, risk, symbol, positions, histories):
+async def entry_readiness(exchange, portfolio, risk, symbol, positions, histories,timeframe='1h',minimum_history=None):
     checked_at=datetime.now(timezone.utc).isoformat()
     result={'eligible':False,'checked_at':checked_at}
     if risk.entry_strategy == 'fast_momentum' and not is_memecoin(symbol):
         return {**result,'code':'meme_focus','message':'Fast meme momentum opens memecoin positions only.'}
-    minimum = 30 if risk.entry_strategy in {'momentum','fast_momentum','auto'} else 336
+    minimum = minimum_history or (30 if risk.entry_strategy in {'momentum','fast_momentum','auto'} else 336)
     if len(histories.get(symbol,[])) < minimum:
-        return {**result,'code':'insufficient_history','message':f'Fewer than {minimum} usable hourly candles; collecting history before eligibility checks.'}
-    budget=entry_budget(portfolio,risk,symbol,positions,histories)
+        return {**result,'code':'insufficient_history','message':f'Fewer than {minimum} usable {timeframe} candles; collecting history before eligibility checks.'}
+    budget=entry_budget(portfolio,risk,symbol,positions,histories,timeframe=timeframe)
     if budget<=.01:
         return {**result,'code':'allocation','message':'No available allocation under the current cash and exposure limits.'}
     try:

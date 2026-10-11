@@ -32,18 +32,22 @@ class AdaptiveParameters:
             raise ValueError('Invalid adaptive momentum threshold')
 
 
-def classify_market_regime(histories, symbols=None, cost=0., parameters=None):
+def classify_market_regime(histories, symbols=None, cost=0., parameters=None,timeframe='1h'):
     """Classify only from completed historical candles shared by all strategies."""
+    if timeframe not in {'1h','15m'}:
+        raise ValueError('Unsupported regime timeframe')
+    factor=4 if timeframe=='15m' else 1
+    required_rows=24*factor+1
     parameters=parameters or AdaptiveParameters()
     symbols=list(symbols or histories)
     expected=max(1,len(symbols))
     valid=[]
     for symbol in symbols:
         rows=histories.get(symbol) or []
-        if len(rows)<25:
+        if len(rows)<required_rows:
             continue
-        close=np.asarray([row.close for row in rows[-25:]],dtype=float)
-        if len(close)==25 and np.isfinite(close).all() and (close>0).all():
+        close=np.asarray([row.close for row in rows[-required_rows:]],dtype=float)
+        if len(close)==required_rows and np.isfinite(close).all() and (close>0).all():
             valid.append(close)
     observed=len(valid)
     coverage=observed/expected
@@ -51,7 +55,7 @@ def classify_market_regime(histories, symbols=None, cost=0., parameters=None):
     if observed<required or coverage<.8:
         return MarketRegime('insufficient',0.,0.,coverage,observed,required)
     breadth=float(np.mean([close[-1]>close[0] for close in valid]))
-    median_three=float(np.median([close[-1]/close[-4]-1 for close in valid]))
+    median_three=float(np.median([close[-1]/close[-1-3*factor]-1 for close in valid]))
     if breadth>=parameters.acceleration_breadth and median_three>max(parameters.acceleration_return,cost):
         name='acceleration'
     elif breadth>=parameters.trend_breadth and median_three>max(parameters.trend_return,cost/3):
@@ -233,6 +237,40 @@ class BreakoutLiquidityModel(RegimeStrategy):
         action='BUY' if buy else 'SELL' if close[-1]<close[-7:].mean() else 'HOLD'
         return self.result(action,(move-self.cost)*ratio,'Breakout confirmed by volume acceleration.',
                            momentum=float(move),volume_ratio=ratio)
+
+
+class IntradayBreakoutModel(RegimeStrategy):
+    """Completed-15-minute breakout with 24-hour breadth and cost-aware strength."""
+    name='intraday_breakout'
+    def __init__(self,regime=None,lookback=24,threshold=.01,volume_ratio=1.5):
+        super().__init__(regime)
+        self.lookback=lookback; self.threshold=threshold; self.required_volume_ratio=volume_ratio
+
+    def predict(self,candles):
+        if not self.is_fitted or len(candles)<max(97,self.lookback+1):
+            return self.result('HOLD',0,'Waiting for completed 15-minute history and 24-hour breadth.')
+        rows=candles[-max(97,self.lookback+1):]
+        close=np.asarray([c.close for c in rows],dtype=float)
+        volume=np.asarray([c.volume for c in rows],dtype=float)
+        if not np.isfinite(close).all() or not np.isfinite(volume).all() or (close<=0).any() or (volume<0).any():
+            return self.result('HOLD',0,'Invalid 15-minute inputs.')
+        move=float(close[-1]/close[-13]-1)  # Three actual hours, not three bars.
+        bar_return=float(close[-1]/close[-2]-1)
+        previous_volume=float(volume[-self.lookback-1:-1].mean())
+        ratio=float(volume[-1]/previous_volume) if previous_volume>0 else 0.
+        breakout=close[-1]>close[-self.lookback-1:-1].max()
+        trend=close[-1]>close[-25:-1].mean()
+        buy=(self.regime.name in {'trend','acceleration'} and breakout and trend and
+             0<bar_return<=.04 and move>max(self.threshold,self.cost*1.5) and
+             ratio>=self.required_volume_ratio)
+        sell=move<0 and close[-1]<close[-5:-1].mean()
+        volatility=float(np.std(np.diff(close[-13:])/close[-13:-1]))*math.sqrt(12)
+        return self.result('BUY' if buy else 'SELL' if sell else 'HOLD',
+            (move-self.cost)/max(volatility,.001),
+            '15-minute breakout: positive market breadth, three-hour strength and volume confirmation.' if buy else
+            '15-minute exit: short-term trend reversed.' if sell else
+            'Waiting for a cost-aware 15-minute breakout and volume confirmation.',
+            momentum=move,volume_ratio=ratio,bar_return=bar_return,signal_timeframe='15m')
 
 
 class DefensiveMeanReversionModel(RegimeStrategy):

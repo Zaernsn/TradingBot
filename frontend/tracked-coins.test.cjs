@@ -1,10 +1,9 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
-const ts = require('typescript');
+const { buildSync } = require('esbuild');
 const filename = path.resolve(__dirname, './src/components/TrackedCoins.tsx');
-const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+const compiled = buildSync({ entryPoints: [filename], bundle: true, platform: 'node', format: 'cjs', jsx: 'automatic', write: false, external: ['react', 'react-dom', 'react/jsx-runtime', 'lucide-react'] }).outputFiles[0].text;
 const loaded = new Module(filename, module);
 loaded.filename = filename;
 loaded.paths = Module._nodeModulePaths(path.dirname(filename));

@@ -6,7 +6,15 @@ from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from app.models.portfolio import MarketCandle
 from app.exchanges.base import OHLCV
 
-INTERVALS={'1h':timedelta(hours=1),'1d':timedelta(days=1)}
+INTERVALS={'15m':timedelta(minutes=15),'1h':timedelta(hours=1),'1d':timedelta(days=1)}
+
+
+def candle_boundary(value,timeframe='1h',ceil=False):
+    value=utc(value)
+    seconds=INTERVALS[timeframe].total_seconds()
+    stamp=value.timestamp()
+    floor=(stamp//seconds)*seconds
+    return datetime.fromtimestamp(floor+(seconds if ceil and stamp>floor else 0),timezone.utc)
 
 
 def utc(value):
@@ -19,6 +27,8 @@ def completed_candles(candles,timeframe='1h',now=None):
     unique={}
     for candle in candles:
         stamp=utc(candle.timestamp)
+        if timeframe=='15m' and stamp!=candle_boundary(stamp,timeframe):
+            raise ValueError('15m candles must align to UTC quarter-hour boundaries')
         values=[candle.open,candle.high,candle.low,candle.close,candle.volume]
         if any(not isfinite(v) for v in values) or min(values[:4])<=0 or candle.volume<0:
             raise ValueError('Invalid OHLCV values')
@@ -47,9 +57,12 @@ def history(db,symbol,timeframe='1h',limit=8760):
     return [OHLCV(utc(r.timestamp),r.open,r.high,r.low,r.close,r.volume) for r in reversed(rows)]
 
 
-async def load_history(db,exchange,symbol,timeframe='1h',limit=8760):
-    fresh=await exchange.get_ohlcv(symbol,timeframe=timeframe,limit=720)
-    archive(db,symbol,timeframe,fresh)
+async def load_history(db,exchange,symbol,timeframe='1h',limit=8760,refresh_if_needed=False):
+    cached=history(db,symbol,timeframe,limit) if refresh_if_needed else []
+    expected=candle_boundary(datetime.now(timezone.utc),timeframe)-INTERVALS[timeframe]
+    if not cached or cached[-1].timestamp<expected:
+        fresh=await exchange.get_ohlcv(symbol,timeframe=timeframe,limit=720)
+        archive(db,symbol,timeframe,fresh)
     candles=history(db,symbol,timeframe,limit)
     if not candles: return []
     interval=INTERVALS[timeframe]

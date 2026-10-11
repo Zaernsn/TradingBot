@@ -7,7 +7,7 @@ from app.ml.models import SignalModel, apply_buy_threshold
 from app.exchanges.base import OHLCV
 from app.exchanges.universe import MEMECOIN_PAIRS, is_memecoin
 from app.services.asset_selector import AssetSelector
-from app.services.market_data import completed_candles, utc
+from app.services.market_data import completed_candles, utc, INTERVALS, candle_boundary
 from app.services.risk_service import RiskManager, entry_budget
 from types import SimpleNamespace
 from dataclasses import asdict, replace
@@ -24,7 +24,14 @@ class PortfolioBacktestEngine:
                  daily_by_symbol=None, max_open_positions=5, model_factory=None, select_assets=True,
                  start_date=None, end_date=None, risk=None, intrabar_stops=True,
                  participation_rate=.01, minimum_order_eur=0., strategy_id='signal-v2',
-                 liquidate_end=True, exit_experiment=None, allow_no_trade_gaps=False):
+                 liquidate_end=True, exit_experiment=None, allow_no_trade_gaps=False,timeframe='1h'):
+        if timeframe not in {'1h','15m'}:
+            raise ValueError('Replay supports 1h or 15m candles')
+        self.timeframe=timeframe; self.interval=INTERVALS[timeframe]
+        if timeframe=='15m' and select_assets:
+            raise ValueError('15m replay requires an explicit preregistered universe (select_assets=False)')
+        self.bars_per_hour=int(timedelta(hours=1)/self.interval)
+        self.bars_per_day=24*self.bars_per_hour
         self.allow_no_trade_gaps=bool(allow_no_trade_gaps)
         from app.ml.exit_experiments import ExitExperiment
         self.exit_experiment=ExitExperiment(**(exit_experiment or {}))
@@ -39,14 +46,14 @@ class PortfolioBacktestEngine:
         self.liquidate_end=bool(liquidate_end)
         if not math.isfinite(initial_cash) or initial_cash<=0 or not 0<=fee_pct<1 or not 0<=slippage_pct<1:
             raise ValueError('Invalid capital or costs')
-        self.data={s:completed_candles(c) for s,c in sorted(candles_by_symbol.items())}
+        self.data={s:completed_candles(c,timeframe) for s,c in sorted(candles_by_symbol.items())}
         if any(len(self.data[s]) != len(c) for s,c in candles_by_symbol.items()):
             raise ValueError('Duplicate or incomplete research candles')
         for candles in self.data.values():
-            if any(c.timestamp.minute or c.timestamp.second or c.timestamp.microsecond for c in candles):
-                raise ValueError('Research candles must align to UTC hours')
-            if not self.allow_no_trade_gaps and any(b.timestamp-a.timestamp!=timedelta(hours=1) for a,b in zip(candles,candles[1:])):
-                raise ValueError('Backtest requires contiguous hourly data; repair missing candles')
+            if any(c.timestamp!=candle_boundary(c.timestamp,timeframe) for c in candles):
+                raise ValueError(f'Research candles must align to UTC {timeframe} boundaries')
+            if not self.allow_no_trade_gaps and any(b.timestamp-a.timestamp!=self.interval for a,b in zip(candles,candles[1:])):
+                raise ValueError(f'Backtest requires contiguous {timeframe} data; repair missing candles')
         self.initial_cash=initial_cash
         self.fee_pct=fee_pct
         self.slippage_pct=slippage_pct
@@ -59,10 +66,12 @@ class PortfolioBacktestEngine:
                     raise ValueError('Daily candles must align to UTC days')
                 self.daily[symbol]=clean
         self.max_open_positions=self.risk.max_open_positions
+        if timeframe=='15m' and model_factory is None and self.risk.entry_strategy!='momentum':
+            raise ValueError('15m replay requires an explicit qualified strategy factory')
         if model_factory is None and self.risk.entry_strategy in {'momentum','fast_momentum','auto'}:
             model_class = {'momentum':MomentumModel,'fast_momentum':FastMomentumModel,
                            'auto':AdaptiveMomentumModel}[self.risk.entry_strategy]
-            model_factory = lambda s: model_class()
+            model_factory = (lambda s: MomentumModel(lookback=24*self.bars_per_hour)) if self.risk.entry_strategy=='momentum' else (lambda s:model_class())
             self.strategy_id = self.risk.entry_strategy.replace('_','-')
         self.model_factory=model_factory or (lambda s:SignalModel(name=f'backtest_{s.replace("/","_")}',persist=False))
         self.select_assets=select_assets
@@ -71,16 +80,17 @@ class PortfolioBacktestEngine:
         if self.start_date and self.end_date and self.start_date >= self.end_date:
             raise ValueError('Start must precede exclusive end')
 
-    @staticmethod
-    def _daily(candles):
+    def _daily(self,candles):
         grouped=defaultdict(list)
         for candle in candles: grouped[candle.timestamp.replace(hour=0,minute=0,second=0,microsecond=0)].append(candle)
         return [OHLCV(day,rows[0].open,max(c.high for c in rows),min(c.low for c in rows),rows[-1].close,sum(c.volume for c in rows))
-                for day,rows in sorted(grouped.items()) if len(rows)==24]
+                for day,rows in sorted(grouped.items()) if len(rows)==self.bars_per_day]
 
-    def run(self,horizon=None,warmup=None,retrain_every=24):
+    def run(self,horizon=None,warmup=None,retrain_every=None):
+        if retrain_every is None:
+            retrain_every=24*self.bars_per_hour
         if warmup is None:
-            warmup=30 if self.risk.entry_strategy in {'momentum','fast_momentum','auto'} else 336
+            warmup=(max(97,30*self.bars_per_hour) if self.timeframe=='15m' else 30) if self.risk.entry_strategy in {'momentum','fast_momentum','auto'} else 336
         horizon = self.risk.prediction_horizon if horizon is None else horizon
         if horizon<1 or warmup<1 or retrain_every<1: raise ValueError('Invalid simulation settings')
         self.cash=self.initial_cash; self.positions={}; self.trades=[]
@@ -97,18 +107,18 @@ class PortfolioBacktestEngine:
         for symbol,rows in self.data.items():
             starts=[]; start=0
             for i,row in enumerate(rows):
-                if i and row.timestamp-rows[i-1].timestamp!=timedelta(hours=1):
+                if i and row.timestamp-rows[i-1].timestamp!=self.interval:
                     start=i
                 starts.append(start)
             segment_start[symbol]=starts
         timeline=[t for t in timeline if any(index[s].get(t,-1)>=warmup for s in self.data)]
         if self.allow_no_trade_gaps and timeline:
             beginning,ending=timeline[0],timeline[-1]
-            timeline=[beginning+timedelta(hours=i) for i in range(int((ending-beginning).total_seconds()/3600)+1)]
+            timeline=[beginning+self.interval*i for i in range(int((ending-beginning)/self.interval)+1)]
             if any(segment_start[s] and max(segment_start[s])>0 for s in self.data):
                 self.limitations.add('No-trade gaps preserved: signals restart warmup; missing quotes cannot execute exits and held marks may be stale')
-        elif any(b-a != timedelta(hours=1) for a,b in zip(timeline,timeline[1:])):
-            raise ValueError('Portfolio timeline contains missing hours')
+        elif any(b-a != self.interval for a,b in zip(timeline,timeline[1:])):
+            raise ValueError('Portfolio timeline contains missing intervals')
         models={s:self.model_factory(s) for s in self.data}
         watchlist=[]; first_prices={}; last_prices={}; daily_counts=defaultdict(int)
         risk=replace(self.risk,prediction_horizon=horizon)
@@ -123,14 +133,14 @@ class PortfolioBacktestEngine:
             for s,p in self.positions.items():
                 if s in current: p.current_price=current[s].open
                 else: self.limitations.add(f'Missing execution/valuation data for held {s}')
-            daily={s:(past[s][-60:] if s in MEMECOIN_PAIRS else [c for c in self.daily.get(s,[]) if utc(c.timestamp)+timedelta(days=1)<=stamp]) for s in eligible}
+            daily={s:(past[s][-60*self.bars_per_hour:] if s in MEMECOIN_PAIRS else [c for c in self.daily.get(s,[]) if utc(c.timestamp)+timedelta(days=1)<=stamp]) for s in eligible}
             watchlist=AssetSelector().select_watchlist(daily,self.max_open_positions,risk.memecoins_enabled,limit=risk.watchlist_limit) if self.select_assets else sorted(eligible)
             if risk.entry_strategy=='auto':
                 round_trip=(1+self.fee_pct)*(1+self.slippage_pct)/((1-self.fee_pct)*(1-self.slippage_pct))-1
                 for model in models.values():
                     if hasattr(model,'set_regime'):
                         model.set_regime(classify_market_regime(
-                            past,watchlist,round_trip,getattr(model,'parameters',None)))
+                            past,watchlist,round_trip,getattr(model,'parameters',None),timeframe=self.timeframe))
             predictions={}
             for symbol in list(dict.fromkeys(list(self.positions)+watchlist)):
                 if symbol not in eligible: continue
@@ -166,14 +176,14 @@ class PortfolioBacktestEngine:
                     if symbol in self.last_exits and stamp-self.last_exits[symbol]<timedelta(hours=1): continue
                 if len(self.positions)>=self.max_open_positions or daily_counts[stamp.date()]>=risk.max_daily_trades: continue
                 if is_memecoin(symbol):
-                    required=30 if risk.entry_strategy in {'momentum','fast_momentum','auto'} else 30*24
+                    required=(97 if self.timeframe=='15m' else 30) if risk.entry_strategy in {'momentum','fast_momentum','auto'} else 30*24*self.bars_per_hour
                     if len(past[symbol])<required: continue
-                    turnover=sum(c.volume*c.close for c in past[symbol][-24:])
+                    turnover=sum(c.volume*c.close for c in past[symbol][-self.bars_per_day:])
                     if turnover<risk.memecoin_min_daily_volume_eur: continue
                 portfolio=SimpleNamespace(equity=self.cash+sum(p.quantity*p.current_price for p in self.positions.values()),cash=self.cash)
                 stop_pct=self.exit_experiment.initial_stop_pct(past[symbol],current[symbol].open,risk.stop_loss_pct)
                 sizing_risk=replace(risk,stop_loss_pct=stop_pct)
-                budget=entry_budget(portfolio,sizing_risk,symbol,list(self.positions.values()),past)
+                budget=entry_budget(portfolio,sizing_risk,symbol,list(self.positions.values()),past,timeframe=self.timeframe)
                 if active_strategy == 'fast_momentum':
                     budget=min(budget,turnover*.001)
                 price=current[symbol].open*(1+self.slippage_pct)
@@ -193,8 +203,8 @@ class PortfolioBacktestEngine:
                     stop=self.exit_experiment.stop_price(position,risk.stop_loss_pct)
                     target=position.avg_entry_price*(1+risk.take_profit_pct)
                     # Conservative stop-first ordering when both barriers are touched.
-                    if bar.low<=stop: self._sell(symbol,min(bar.open,stop),stamp+timedelta(hours=1))
-                    elif bar.high>=target: self._sell(symbol,target,stamp+timedelta(hours=1))
+                    if bar.low<=stop: self._sell(symbol,min(bar.open,stop),stamp+self.interval)
+                    elif bar.high>=target: self._sell(symbol,target,stamp+self.interval)
             for s,p in self.positions.items():
                 if s in current:
                     p.current_price=current[s].close
@@ -205,7 +215,7 @@ class PortfolioBacktestEngine:
             if 1-equity/self.peak>=risk.max_drawdown_pct: self.halted=True
             self.curve.append(equity)
             self.cash_curve.append(self.cash)
-            self.curve_timestamps.append(stamp+timedelta(hours=1))
+            self.curve_timestamps.append(stamp+self.interval)
             self.exposures.append((equity-self.cash)/equity if equity>0 else 0.)
             self._rolling_loss_halt(equity)
         if timeline and self.liquidate_end:
@@ -213,7 +223,7 @@ class PortfolioBacktestEngine:
                 if last_stamps.get(symbol)!=timeline[-1]:
                     self.limitations.add(f'Stale terminal mark for {symbol}; no terminal fill')
                     continue
-                self._sell(symbol,last_prices[symbol],timeline[-1]+timedelta(hours=1))
+                self._sell(symbol,last_prices[symbol],timeline[-1]+self.interval)
             self.curve[-1]=self.cash+sum(p.quantity*p.current_price for p in self.positions.values())
         full=[s for s in first_prices if first_stamps[s]==timeline[0] and last_stamps[s]==timeline[-1]] if timeline else []
         if len(full)!=len(self.data): self.limitations.add('Some assets lack full-period benchmark coverage')
@@ -222,8 +232,8 @@ class PortfolioBacktestEngine:
                 'select_assets':self.select_assets,'start':self.start_date,'end':self.end_date,'initial_cash':self.initial_cash,
                 'intrabar_stops':self.intrabar_stops,'participation_rate':self.participation_rate,'minimum_order_eur':self.minimum_order_eur,
                 'liquidate_end':self.liquidate_end,'exit_experiment':asdict(self.exit_experiment),
-                'allow_no_trade_gaps':self.allow_no_trade_gaps}
-        data_hash=digest({'hourly':{s:[vars(c) for c in rows] for s,rows in self.data.items()},
+                'allow_no_trade_gaps':self.allow_no_trade_gaps,'timeframe':self.timeframe}
+        data_hash=digest({self.timeframe:{s:[vars(c) for c in rows] for s,rows in self.data.items()},
                           'daily':{s:[vars(c) for c in rows] for s,rows in self.daily.items()}})
         result.update(experiment={'configuration':config,'data_sha256':data_hash,'run_id':digest({'config':config,'data':data_hash})},
                       closed_trades=sum(t['side']=='SELL' for t in self.trades),data_limitations=sorted(self.limitations),
@@ -235,7 +245,10 @@ class PortfolioBacktestEngine:
                           'high_water_price':position.high_water_price,'experiment_stop_pct':position.experiment_stop_pct,
                           'opened_at':position.opened_at}
                           for symbol,position in self.positions.items()},
-                      **curve_metrics(self.curve))
+                      **curve_metrics(self.curve,periods_per_year=365*self.bars_per_day,block_size=self.bars_per_day))
+        if self.timeframe=='15m':
+            result['bar_mean_return_interval']=result.pop('hourly_mean_return_interval')
+        result['timeframe']=self.timeframe
         return result
 
     def _trade(self,symbol,side,quantity,price,fee,pnl,stamp):
@@ -243,10 +256,10 @@ class PortfolioBacktestEngine:
         self.trades.append(dict(symbol=symbol,timestamp=stamp,side=side,quantity=quantity,price=price,fee=fee,pnl=pnl))
 
     def _rolling_loss_halt(self, equity):
-        # Replay uses hourly checkpoints; there are no funding flows in a run.
+        # Keep 24-hour / seven-day windows at the replay's actual bar duration.
         for hours, limit in ((24,self.risk.daily_loss_pct),(168,self.risk.weekly_loss_pct)):
             if limit:
-                baseline=self.curve[max(0,len(self.curve)-1-hours)]
+                baseline=self.curve[max(0,len(self.curve)-1-hours*self.bars_per_hour)]
                 if baseline>0 and 1-equity/baseline>=limit:
                     self.halted=True
 
@@ -274,7 +287,7 @@ class PortfolioBacktestEngine:
             total_return_pct=float(values[-1]/self.initial_cash-1),num_trades=len(self.trades),
             win_rate=sum(t['pnl']>0 for t in sells)/len(sells) if sells else 0.,
             max_drawdown_pct=float(drawdown.min()),
-            sharpe_ratio=float(returns.mean()/returns.std(ddof=1)*math.sqrt(365*24)) if len(returns)>1 and returns.std(ddof=1)>1e-12 else 0.,
+            sharpe_ratio=float(returns.mean()/returns.std(ddof=1)*math.sqrt(365*self.bars_per_day)) if len(returns)>1 and returns.std(ddof=1)>1e-12 else 0.,
             expectancy=float(np.mean([t['pnl'] for t in sells])) if sells else 0.,
             profit_factor=sum(profits)/losses if losses else None,
             total_fees=self.fees,turnover=self.turnover/self.initial_cash,
@@ -282,7 +295,7 @@ class PortfolioBacktestEngine:
             per_month_pnl=dict(per_month),top_five_profit_share=sum(profits[:5])/sum(profits) if profits else 0.,
             per_symbol_pnl=per_symbol,benchmarks={'cash':0.,'equal_weight_buy_hold':float(np.mean(list(factors.values()))) if factors else 0.,
                                                'btc_buy_hold':factors.get('BTC/EUR')},
-            evaluation_start=timeline[0] if timeline else None,evaluation_end=timeline[-1]+timedelta(hours=1) if timeline else None,
+            evaluation_start=timeline[0] if timeline else None,evaluation_end=timeline[-1]+self.interval if timeline else None,
             evaluated_bars=len(timeline),risk_halted=self.halted,trades=self.trades,
             warnings=([] if timeline else ['Insufficient history for the requested evaluation window'])+
                      ['Historical simulation; thresholds are not evidence of future profitability',

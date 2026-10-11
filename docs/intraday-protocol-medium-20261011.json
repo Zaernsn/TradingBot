@@ -1,0 +1,59 @@
+{
+  "development_start": "2025-08-01T00:00:00+00:00",
+  "holdout_start": "2026-04-01T00:00:00+00:00",
+  "end": "2026-07-01T00:00:00+00:00",
+  "candidates": [
+    "intraday-breakout"
+  ],
+  "warmup": 97,
+  "initial_cash": 500,
+  "select_assets": false,
+  "minimum_order_eur": 5,
+  "participation_rate": 0.001,
+  "historical_universe_evidence": false,
+  "allow_no_trade_gaps": true,
+  "adaptive_parameters": {
+    "trend_breadth": 0.6,
+    "trend_return": 0.0025,
+    "acceleration_breadth": 0.7,
+    "acceleration_return": 0.0075,
+    "momentum_threshold": 0.015
+  },
+  "risk": {
+    "max_position_pct": 0.2,
+    "stop_loss_pct": 0.04,
+    "take_profit_pct": 0.1,
+    "fee_pct": 0.008,
+    "slippage_pct": 0.001,
+    "max_daily_trades": 10,
+    "trading_pair": null,
+    "prediction_horizon": 12,
+    "max_open_positions": 5,
+    "max_drawdown_pct": 0.1,
+    "max_total_exposure_pct": 0.6,
+    "max_correlated_exposure_pct": 0.4,
+    "memecoins_enabled": true,
+    "memecoin_max_position_pct": 0.2,
+    "memecoin_max_exposure_pct": 0.4,
+    "memecoin_max_spread_pct": 0.003,
+    "memecoin_min_daily_volume_eur": 250000,
+    "risk_per_trade_pct": 0.01,
+    "max_holding_hours": 24,
+    "entry_strategy": "auto"
+  },
+  "notes": [
+    "Predeclared completed-15-minute breakout; offline research only.",
+    "Same six EUR markets and development dates as the hourly baseline.",
+    "Saved hourly sizing horizon is converted to four bars per hour.",
+    "Current-cost scenario: 0.8% fee and 0.1% slippage per side; stress doubles both.",
+    "Gaps remain missing and restart warmup; no invented candles or fills.",
+    "April-June 2026 remains reserved; no final-test evaluation in this development study.",
+    "Three fixed variants registered before evaluating any of them."
+  ],
+  "timeframe": "15m",
+  "intraday_parameters": {
+    "lookback": 24,
+    "threshold": 0.01,
+    "volume_ratio": 1.5
+  }
+}

@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Settings, LogOut, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Settings, LogOut, TrendingUp, Radar, FlaskConical } from 'lucide-react';
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -24,7 +24,15 @@ export default function Layout() {
             <div className="nav-links">
               <Link to="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
                 <LayoutDashboard size={16} />
-                Dashboard
+                Overview
+              </Link>
+              <Link to="/markets" className={`nav-link ${isActive('/markets') ? 'active' : ''}`}>
+                <Radar size={16} />
+                Markets
+              </Link>
+              <Link to="/strategy-lab" className={`nav-link ${isActive('/strategy-lab') ? 'active' : ''}`}>
+                <FlaskConical size={16} />
+                Strategy Lab
               </Link>
               <Link to="/settings" className={`nav-link ${isActive('/settings') ? 'active' : ''}`}>
                 <Settings size={16} />

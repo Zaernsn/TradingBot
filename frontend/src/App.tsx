@@ -5,6 +5,8 @@ const Login = lazy(() => import('./pages/Login'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Markets = lazy(() => import('./pages/Markets'));
+const StrategyLab = lazy(() => import('./pages/StrategyLab'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Layout = lazy(() => import('./components/Layout'));
 
@@ -34,6 +36,8 @@ function App() {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="markets" element={<Markets />} />
+          <Route path="strategy-lab" element={<StrategyLab />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes></Suspense>

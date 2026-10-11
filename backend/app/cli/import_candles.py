@@ -1,4 +1,4 @@
-"""Import completed hourly/daily UTC OHLCV CSV data into the persistent archive."""
+"""Import completed 15-minute/hourly/daily UTC OHLCV CSV into the archive."""
 import argparse
 import csv
 from datetime import datetime

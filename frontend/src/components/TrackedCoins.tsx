@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Search, Flame, TrendingUp, TrendingDown, Layers, Wallet } from 'lucide-react';
 import type { Position, Signal, BotState, EntryDecision } from '../types';
+import { decisionCopy } from '../lib/statusCopy';
 
 const freshCheck = (stamp: string | undefined, now: number) => {
   const age = stamp ? now - new Date(stamp).getTime() : Infinity;
@@ -59,7 +60,7 @@ export function summarizeCandles(price: number, candles: Candle[], now = Date.no
 }
 const names: Record<string, string> = { BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', XRP: 'XRP', ADA: 'Cardano', DOGE: 'Dogecoin', SHIB: 'Shiba Inu', PEPE: 'Pepe', BONK: 'Bonk', WIF: 'dogwifhat', FLOKI: 'Floki', POPCAT: 'Popcat', BRETT: 'Brett', MOG: 'Mog Coin', MEW: 'cat in a dogs world', BOME: 'Book of Meme', SNEK: 'Snek', TURBO: 'Turbo', NEIRO: 'Neiro', PNUT: 'Peanut the Squirrel', GOAT: 'Goatseus Maximus', ACT: 'Act I', FARTCOIN: 'Fartcoin', TRUMP: 'Official Trump', MELANIA: 'Melania Meme', SPX: 'SPX6900', PONKE: 'Ponke', MEME: 'Memecoin', DEGEN: 'Degen', GIGA: 'Gigachad' };
 const core = new Set(['BTC', 'ETH', 'SOL', 'XRP', 'ADA']);
-const filters = [{ key: 'all', label: 'All tracked', icon: Layers }, { key: 'eligible', label: 'Eligible', icon: TrendingUp }, { key: 'buy', label: 'Buy candidates', icon: TrendingUp }, { key: 'waiting', label: 'Waiting / blocked', icon: Layers }, { key: 'meme', label: 'Memecoins', icon: Flame }, { key: 'gainers', label: 'Gainers', icon: TrendingUp }, { key: 'losers', label: 'Losers', icon: TrendingDown }, { key: 'held', label: 'In portfolio', icon: Wallet }] as const;
+const filters = [{ key: 'actionable', label: 'Actionable', icon: TrendingUp }, { key: 'all', label: 'All tracked', icon: Layers }, { key: 'eligible', label: 'Eligible', icon: TrendingUp }, { key: 'buy', label: 'Buy candidates', icon: TrendingUp }, { key: 'waiting', label: 'Waiting / blocked', icon: Layers }, { key: 'meme', label: 'Memecoins', icon: Flame }, { key: 'gainers', label: 'Gainers', icon: TrendingUp }, { key: 'losers', label: 'Losers', icon: TrendingDown }, { key: 'held', label: 'In portfolio', icon: Wallet }] as const;
 type Sort = 'day' | 'hour' | 'week' | 'volume' | 'price';
 const money = (n: number, compact = false) => n > 0 && n < .0000001 && !compact ? '< €0.0000001' : new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', notation: compact ? 'compact' : 'standard', maximumFractionDigits: compact ? 2 : 7 }).format(n);
 function Change({ value }: { value: number | null | undefined }) {
@@ -67,21 +68,19 @@ function Change({ value }: { value: number | null | undefined }) {
   return <span className={`coin-change ${value > 0 ? 'positive' : value < 0 ? 'negative' : ''}`}>{value > 0 ? <ArrowUpRight size={14} /> : value < 0 ? <ArrowDownRight size={14} /> : null}{Math.abs(value).toFixed(2)}%</span>;
 }
 export default function TrackedCoins({ symbols, quotes, signals, positions, decisions, running, discovery, loading = false }: { symbols: string[]; quotes: Record<string, CoinQuote>; signals: Signal[]; positions: Position[]; decisions?: BotState['entry_decisions']; running?: boolean; discovery?: BotState['discovery_stats']; loading?: boolean }) {
-  const [filter, setFilter] = useState<string>('all');
+  const [filter, setFilter] = useState<string>('actionable');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<Sort>('day');
   const [ascending, setAscending] = useState(false);
   const allSymbols = [...new Set([...symbols, ...positions.map(p => p.symbol)])];
   const now = Date.now();
   const blockers: Record<string, number> = {};
-  const labels: Record<string, string> = { training: 'Retraining', blocked: 'Recovery blocked', drift: 'Feature drift', validation_failed: 'Validation failed', model_unavailable: 'Model unavailable', history_unavailable: 'History unavailable', market_unavailable: 'Market unavailable', risk_halt: 'Risk paused', position_cap: 'Position limit', daily_limit: 'Daily limit', allocation: 'Allocation limit', waiting_candle: 'Waiting for candle', ready: 'Waiting for signal' };
   for (const symbol of allSymbols) {
     if (positions.some(p => p.symbol === symbol)) continue;
     const decision = decisions?.[symbol];
     const state = readiness(false, running, decision, now);
     if (state.buy) continue;
-    const key = !running ? 'Bot stopped' : !decision || !freshCheck(decision.checked_at, now) ? 'Awaiting current check' :
-      labels[decision.code === 'waiting_candle' ? decision.model_status || 'waiting_candle' : decision.code] || 'Entry checks';
+    const key = !running ? 'Bot stopped' : !decision || !freshCheck(decision.checked_at, now) ? 'Awaiting current check' : decisionCopy(decision).title;
     blockers[key] = (blockers[key] || 0) + 1;
   }
   const rows = allSymbols.filter(symbol => {
@@ -92,6 +91,7 @@ export default function TrackedCoins({ symbols, quotes, signals, positions, deci
     return `${ticker} ${names[ticker] || ''}`.toLowerCase().includes(query.toLowerCase().trim()) &&
       (filter !== 'meme' || !core.has(ticker)) && (filter !== 'gainers' || (day != null && day > 0)) &&
       (filter !== 'losers' || (day != null && day < 0)) && (filter !== 'held' || held) &&
+      (filter !== 'actionable' || held || state.buy || (decisions?.[symbol] && decisions[symbol].code !== 'waiting_candle' && decisionCopy(decisions[symbol]).severity !== 'info')) &&
       (filter !== 'eligible' || state.eligible) && (filter !== 'buy' || state.buy) &&
       (filter !== 'waiting' || (!held && !state.buy));
   }).sort((a, b) => {
@@ -117,7 +117,8 @@ export default function TrackedCoins({ symbols, quotes, signals, positions, deci
         const signal = signals.find(s => s.symbol === symbol);
         const held = positions.some(p => p.symbol === symbol);
         const hue = [...ticker].reduce((v, c) => v + c.charCodeAt(0), 0) * 47 % 360;
-        return <tr key={symbol}><td className="coin-muted">{index + 1}</td><td><div className="coin-identity"><span className="coin-avatar" aria-hidden="true" style={{ background: `hsl(${hue} 45% 22%)`, color: `hsl(${hue} 80% 78%)` }}>{ticker.slice(0, 2)}</span><div><strong>{names[ticker] || ticker}</strong><div className="coin-symbol">{ticker}<span>{core.has(ticker) ? 'CORE' : 'MEME'}</span>{held && <span>HELD</span>}</div></div></div></td><td><Change value={q?.hour} /></td><td><Change value={q?.day} /></td><td><Change value={q?.week} /></td><td className="coin-muted">{q?.volume != null ? money(q.volume, true) : '—'}</td><td className="coin-price">{q?.price > 0 ? money(q.price) : '—'}</td><td><span className={`badge ${signal?.action === 'BUY' ? 'badge-success' : signal?.action === 'SELL' ? 'badge-danger' : 'badge-ghost'}`}>{signal?.action || '—'}</span><div className="coin-entry-hint">{entryHint(held, running, decisions?.[symbol])}</div>{decisions?.[symbol]?.market_note && <div className="coin-entry-hint">{decisions[symbol].market_note}</div>}<ModelDetails decision={decisions?.[symbol]} />{decisions?.[symbol]?.checked_at && <small className="coin-muted">Checked {new Date(decisions[symbol].checked_at).toLocaleTimeString()}</small>}</td></tr>;
+        const copy = decisionCopy(decisions?.[symbol]);
+        return <tr key={symbol}><td className="coin-muted">{index + 1}</td><td><div className="coin-identity"><span className="coin-avatar" aria-hidden="true" style={{ background: `hsl(${hue} 45% 22%)`, color: `hsl(${hue} 80% 78%)` }}>{ticker.slice(0, 2)}</span><div><strong>{names[ticker] || ticker}</strong><div className="coin-symbol">{ticker}<span>{core.has(ticker) ? 'CORE' : 'MEME'}</span>{held && <span>HELD</span>}</div></div></div></td><td><Change value={q?.hour} /></td><td><Change value={q?.day} /></td><td><Change value={q?.week} /></td><td className="coin-muted">{q?.volume != null ? money(q.volume, true) : '—'}</td><td className="coin-price">{q?.price > 0 ? money(q.price) : '—'}</td><td><span className={`badge ${signal?.action === 'BUY' ? 'badge-success' : signal?.action === 'SELL' ? 'badge-danger' : 'badge-ghost'}`}>{signal?.action || '—'}</span><div className={`coin-entry-hint status-${copy.severity}`}><strong>{held ? 'Position held' : copy.title}</strong><br />{entryHint(held, running, decisions?.[symbol])}</div>{!held && decisions?.[symbol] && <div className="coin-entry-action">Next: {copy.action}</div>}{decisions?.[symbol]?.market_note && <div className="coin-entry-hint">{decisions[symbol].market_note}</div>}<ModelDetails decision={decisions?.[symbol]} />{decisions?.[symbol]?.checked_at && <small className="coin-muted">Checked {new Date(decisions[symbol].checked_at).toLocaleTimeString()}</small>}</td></tr>;
       })}</tbody></table>
       {!rows.length && <div className="empty">{symbols.length ? 'No tracked coins match this filter.' : 'No tracked coins yet. Start the bot to build your watchlist.'}</div>}
     </div>}

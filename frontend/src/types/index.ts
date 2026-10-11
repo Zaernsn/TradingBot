@@ -105,6 +105,9 @@ export interface BotState {
 }
 
 export interface ResearchCandidate {
+  timeframe?: '1h' | '15m';
+  stopped_stage?: string | null;
+  validation_windows?: Array<{ start: string; end: string; passed: boolean }>;
   candidate_id: string;
   family: string;
   status: string;
@@ -114,10 +117,17 @@ export interface ResearchCandidate {
   shadow_closed_trades: number;
   shadow_trades_required: number;
   failed_checks: string[];
+  promotion_reason?: string | null;
+  shadow_rejection?: string | null;
+  research_revisions?: number;
+  holdout?: { total_return_pct?: number | null; expectancy?: number | null; max_drawdown_pct?: number | null } | null;
+  stress?: { total_return_pct?: number | null } | null;
   canary?: { closed_round_trips?: number; realized_pnl?: number; suspension_reason?: string } | null;
 }
 
 export interface ResearchStatus {
+  learning_policy?: { enabled: boolean; maximum_strategy_identities: number; cadence_hours: number; batch_size: number };
+  research?: { status?: string; message?: string } | null;
   counts: Record<string, number>;
   candidates: ResearchCandidate[];
   live_candidate?: ResearchCandidate | null;
